@@ -327,8 +327,17 @@ async def send_add_product_guidance(update: Update) -> None:
 
 async def add_product_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not user or not is_admin(user.id):
-        # Non-admin user gets NO response at all (silent ignore)
+    if not user:
+        return
+    if not is_admin(user.id):
+        await update.message.reply_text(
+            f"❌ <b>Unauthorized Admin Command</b>\n\n"
+            f"Your Telegram User ID is: <code>{user.id}</code>\n\n"
+            f"This ID is not listed in <code>ADMIN_ID</code> on Render.\n"
+            f"Please go to Render Dashboard -> Environment Variables and set:\n"
+            f"<b>ADMIN_ID</b> = <code>{user.id}</code>",
+            parse_mode="HTML",
+        )
         return
 
     full_text = update.message.text or ""
@@ -458,8 +467,17 @@ async def send_stock_guidance(update: Update) -> None:
 
 async def stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not user or not is_admin(user.id):
-        # Non-admin user gets NO response at all (silent ignore)
+    if not user:
+        return
+    if not is_admin(user.id):
+        await update.message.reply_text(
+            f"❌ <b>Unauthorized Admin Command</b>\n\n"
+            f"Your Telegram User ID is: <code>{user.id}</code>\n\n"
+            f"This ID is not listed in <code>ADMIN_ID</code> on Render.\n"
+            f"Please go to Render Dashboard -> Environment Variables and set:\n"
+            f"<b>ADMIN_ID</b> = <code>{user.id}</code>",
+            parse_mode="HTML",
+        )
         return
 
     full_text = update.message.text or ""
