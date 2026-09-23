@@ -3,51 +3,45 @@ Product catalog for the Shop.
 
 HOW TO ADD / EDIT PRODUCTS
 --------------------------
-Just edit the PRODUCTS list below. Each product is a dict with:
-
-    "id"          : short unique string (letters/numbers/underscores). Don't reuse ids.
+Each product is a dict with:
+    "id"          : short unique string (letters/numbers/underscores).
     "name"        : display name shown in the shop.
-    "price"       : price in USD (float). Balance is deducted by this amount.
-    "description" : short text shown on the product page (HTML allowed).
+    "price"       : price in USD (float).
+    "description" : structured text shown on the product page (HTML allowed).
     "stock"       : how many are available. Use None for unlimited.
-    "delivery"    : the content the buyer receives after purchase (HTML allowed).
-                    e.g. an account, a code, a license key, or instructions.
-
-Example of adding a new product — copy a block and change the values:
-
-    {
-        "id": "spotify_1m",
-        "name": "🎵 Spotify Premium — 1 Month",
-        "price": 2.50,
-        "description": "Private Spotify Premium upgrade on your own account.",
-        "stock": 20,
-        "delivery": "Send your Spotify email to support and we'll upgrade it.",
-    },
-
-Notes:
-  - Stock is decremented automatically on each successful purchase.
-  - For real digital goods you'd usually store one-time codes; here `delivery`
-    is a single message sent to every buyer. Keep it generic or wire it to your
-    own fulfilment later.
+    "delivery"    : default delivery text.
 """
 
 PRODUCTS = [
+    {
+        "id": "chatgptplus_1m",
+        "name": "🤖 ChatGPT Plus — 1 Month",
+        "price": 8.00,
+        "description": (
+            "🤖 <b>ChatGPT Plus</b> — GPT-4o, DALL-E 3 & Web Browsing.\n\n"
+            "💵 Rate: <b>$8 / month</b>\n"
+            "⏳ Duration: <b>1 month</b>\n"
+            "📱 Platform: <b>Mobile & PC</b>\n"
+            "🔄 Replacement: <b>No</b> — no replacement provided"
+        ),
+        "stock": 0,
+        "delivery": "Digital Account Credentials",
+    },
     {
         "id": "kiro_pro_1m",
         "name": "⚡ Kiro Pro — 1 Month",
         "price": 9.00,
         "description": (
             "⚡ <b>Kiro Pro</b> — perfect for everyday use.\n\n"
-            "💵 Rate: <b>$9</b> / month\n"
+            "💵 Rate: <b>$9 / month</b>\n"
             "⏳ Duration: <b>1 month</b>\n"
-            "🎟 Credits: <b>1,000</b> credits\n"
-            "🔄 Replacement: <b>Yes</b> — free replacement if it stops working"
+            "🎟 Credits: <b>1,000 credits</b>\n"
+            "🔄 Replacement: <b>No</b> — no replacement provided"
         ),
         "stock": 100,
         "delivery": (
             "✅ Your <b>Kiro Pro (1 Month)</b> order is confirmed!\n"
-            "Your access details will be delivered by support shortly.\n"
-            "Keep your order ID handy for any replacement request."
+            "Your access details will be delivered shortly."
         ),
     },
     {
@@ -56,16 +50,15 @@ PRODUCTS = [
         "price": 13.00,
         "description": (
             "✨ <b>Kiro Pro+</b> — more power for heavier workflows.\n\n"
-            "💵 Rate: <b>$13</b> / month\n"
+            "💵 Rate: <b>$13 / month</b>\n"
             "⏳ Duration: <b>1 month</b>\n"
-            "🎟 Credits: <b>2,000</b> credits\n"
-            "🔄 Replacement: <b>Yes</b> — free replacement if it stops working"
+            "🎟 Credits: <b>2,000 credits</b>\n"
+            "🔄 Replacement: <b>No</b> — no replacement provided"
         ),
         "stock": 100,
         "delivery": (
             "✅ Your <b>Kiro Pro+ (1 Month)</b> order is confirmed!\n"
-            "Your access details will be delivered by support shortly.\n"
-            "Keep your order ID handy for any replacement request."
+            "Your access details will be delivered shortly."
         ),
     },
     {
@@ -74,16 +67,15 @@ PRODUCTS = [
         "price": 35.00,
         "description": (
             "🚀 <b>Kiro Pro Max</b> — for power users and teams.\n\n"
-            "💵 Rate: <b>$35</b> / month\n"
+            "💵 Rate: <b>$35 / month</b>\n"
             "⏳ Duration: <b>1 month</b>\n"
-            "🎟 Credits: <b>6,000</b> credits\n"
-            "🔄 Replacement: <b>Yes</b> — free replacement if it stops working"
+            "🎟 Credits: <b>6,000 credits</b>\n"
+            "🔄 Replacement: <b>No</b> — no replacement provided"
         ),
         "stock": 50,
         "delivery": (
             "✅ Your <b>Kiro Pro Max (1 Month)</b> order is confirmed!\n"
-            "Your access details will be delivered by support shortly.\n"
-            "Keep your order ID handy for any replacement request."
+            "Your access details will be delivered shortly."
         ),
     },
     {
@@ -92,16 +84,15 @@ PRODUCTS = [
         "price": 70.00,
         "description": (
             "👑 <b>Kiro Power</b> — the ultimate plan, maximum limits.\n\n"
-            "💵 Rate: <b>$70</b> / month\n"
+            "💵 Rate: <b>$70 / month</b>\n"
             "⏳ Duration: <b>1 month</b>\n"
-            "🎟 Credits: <b>15,000</b> credits\n"
-            "🔄 Replacement: <b>Yes</b> — free replacement if it stops working"
+            "🎟 Credits: <b>15,000 credits</b>\n"
+            "🔄 Replacement: <b>No</b> — no replacement provided"
         ),
         "stock": 25,
         "delivery": (
             "✅ Your <b>Kiro Power (1 Month)</b> order is confirmed!\n"
-            "Your access details will be delivered by support shortly.\n"
-            "Keep your order ID handy for any replacement request."
+            "Your access details will be delivered shortly."
         ),
     },
 ]

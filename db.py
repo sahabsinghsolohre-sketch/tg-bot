@@ -543,7 +543,11 @@ def seed_products(products: list) -> None:
                 """
                 INSERT INTO products (id, name, price, description, stock, delivery)
                 VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT (id) DO NOTHING
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    price = EXCLUDED.price,
+                    description = EXCLUDED.description,
+                    delivery = EXCLUDED.delivery
                 """,
                 (p["id"], p["name"], float(p["price"]), p["description"], p.get("stock"), p.get("delivery", "")),
             )
