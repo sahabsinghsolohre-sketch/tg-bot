@@ -987,6 +987,13 @@ def main() -> None:
             "Get a token from @BotFather and set it before running."
         )
 
+    # Ensure main thread has an event loop set (required on Python 3.12+)
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
     # Start HTTP server thread for cloud platforms like Render
     threading.Thread(target=start_health_check_server, daemon=True).start()
 
