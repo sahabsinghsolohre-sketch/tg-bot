@@ -538,26 +538,21 @@ def add_accounts_to_stock(product_id: str, accounts: list[str]) -> int:
 def seed_products(products: list) -> None:
     with _lock, _connect() as conn:
         for p in products:
-            _exec(
+            cur = _exec(
                 conn,
-                """
-                INSERT INTO products (id, name, price, description, stock, delivery)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT (id) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    price = EXCLUDED.price,
-                    description = EXCLUDED.description,
-                    delivery = EXCLUDED.delivery
-                """,
-                (p["id"], p["name"], float(p["price"]), p["description"], p.get("stock"), p.get("delivery", "")),
+                "UPDATE products SET name = ?, price = ?, description = ?, delivery = ? WHERE id = ?",
+                (p["name"], float(p["price"]), p["description"], p.get("delivery", ""), p["id"]),
             )
+            if cur.rowcount == 0:
+                _exec(
+                    conn,
+                    "INSERT INTO products (id, name, price, description, stock, delivery) VALUES (?, ?, ?, ?, ?, ?)",
+                    (p["id"], p["name"], float(p["price"]), p["description"], p.get("stock", 0), p.get("delivery", "")),
+                )
             _exec(
                 conn,
-                """
-                INSERT INTO product_stock (product_id, stock) VALUES (?, ?)
-                ON CONFLICT (product_id) DO NOTHING
-                """,
-                (p["id"], p.get("stock")),
+                "INSERT INTO product_stock (product_id, stock) VALUES (?, ?) ON CONFLICT (product_id) DO NOTHING",
+                (p["id"], p.get("stock", 0)),
             )
 
 
@@ -591,26 +586,20 @@ def add_product(
     delivery: str = "",
 ) -> None:
     with _lock, _connect() as conn:
-        _exec(
+        cur = _exec(
             conn,
-            """
-            INSERT INTO products (id, name, price, description, stock, delivery)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                name = EXCLUDED.name,
-                price = EXCLUDED.price,
-                description = EXCLUDED.description,
-                stock = EXCLUDED.stock,
-                delivery = EXCLUDED.delivery
-            """,
-            (product_id, name, price, description, stock, delivery),
+            "UPDATE products SET name = ?, price = ?, description = ?, stock = ?, delivery = ? WHERE id = ?",
+            (name, price, description, stock, delivery, product_id),
         )
+        if cur.rowcount == 0:
+            _exec(
+                conn,
+                "INSERT INTO products (id, name, price, description, stock, delivery) VALUES (?, ?, ?, ?, ?, ?)",
+                (product_id, name, price, description, stock, delivery),
+            )
         _exec(
             conn,
-            """
-            INSERT INTO product_stock (product_id, stock) VALUES (?, ?)
-            ON CONFLICT(product_id) DO UPDATE SET stock = EXCLUDED.stock
-            """,
+            "INSERT INTO product_stock (product_id, stock) VALUES (?, ?) ON CONFLICT (product_id) DO UPDATE SET stock = EXCLUDED.stock" if IS_POSTGRES else "INSERT INTO product_stock (product_id, stock) VALUES (?, ?) ON CONFLICT (product_id) DO UPDATE SET stock = excluded.stock",
             (product_id, stock),
         )
 
