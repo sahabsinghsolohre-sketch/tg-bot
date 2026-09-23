@@ -1,0 +1,720 @@
+"""
+Database storage for user balances, language, referrals, pending deposits and orders.
+Supports both PostgreSQL (via Neon / DATABASE_URL env var) and local SQLite (bot.db fallback).
+"""
+
+import os
+import sqlite3
+import threading
+import time
+from contextlib import contextmanager
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+IS_POSTGRES = bool(DATABASE_URL)
+
+if IS_POSTGRES:
+    import psycopg2
+    import psycopg2.extras
+
+DB_PATH = "bot.db"
+
+REFERRAL_PERCENT = 0.01
+REFERRAL_MIN_DEPOSIT = 10.0
+
+_lock = threading.Lock()
+
+
+@contextmanager
+def _connect():
+    if IS_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+    else:
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def _exec(conn, sql: str, params: tuple = ()):
+    """Execute SQL query with driver-appropriate parameter placeholder replacement."""
+    if IS_POSTGRES:
+        pg_sql = sql.replace("?", "%s")
+        if "ROUND(unique_amount, 4)" in pg_sql:
+            pg_sql = pg_sql.replace("ROUND(unique_amount, 4)", "ROUND(CAST(unique_amount AS numeric), 4)")
+        if "ROUND(%s, 4)" in pg_sql:
+            pg_sql = pg_sql.replace("ROUND(%s, 4)", "ROUND(CAST(%s AS numeric), 4)")
+        cur = conn.cursor()
+        cur.execute(pg_sql, params)
+        return cur
+    else:
+        return conn.execute(sql, params)
+
+
+def _column_exists(conn, table: str, column: str) -> bool:
+    if IS_POSTGRES:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM information_schema.columns WHERE table_name = %s AND column_name = %s",
+            (table, column),
+        )
+        return cur.fetchone() is not None
+    else:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return any(r["name"] == column for r in rows)
+
+
+def init_db() -> None:
+    """Create tables if they don't exist, and add any missing columns (migrations)."""
+    with _lock, _connect() as conn:
+        if IS_POSTGRES:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id           BIGINT PRIMARY KEY,
+                    balance           DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    orders            INTEGER NOT NULL DEFAULT 0,
+                    language          TEXT NOT NULL DEFAULT 'en',
+                    referred_by       BIGINT,
+                    referrals          INTEGER NOT NULL DEFAULT 0,
+                    referral_earnings  DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    deposits_count     INTEGER NOT NULL DEFAULT 0,
+                    referral_qualified INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS pending_deposits (
+                    id            SERIAL PRIMARY KEY,
+                    user_id       BIGINT NOT NULL,
+                    base_amount   DOUBLE PRECISION NOT NULL,
+                    unique_amount DOUBLE PRECISION NOT NULL,
+                    created_at    BIGINT NOT NULL,
+                    expires_at    BIGINT NOT NULL,
+                    status        TEXT NOT NULL DEFAULT 'pending',
+                    tx_hash       TEXT
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_pending_status
+                    ON pending_deposits(status);
+
+                CREATE TABLE IF NOT EXISTS orders (
+                    id           SERIAL PRIMARY KEY,
+                    user_id      BIGINT NOT NULL,
+                    product_id   TEXT NOT NULL,
+                    product_name TEXT NOT NULL,
+                    price        DOUBLE PRECISION NOT NULL,
+                    created_at   BIGINT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_orders_user
+                    ON orders(user_id);
+
+                CREATE TABLE IF NOT EXISTS products (
+                    id          TEXT PRIMARY KEY,
+                    name        TEXT NOT NULL,
+                    price       DOUBLE PRECISION NOT NULL,
+                    description TEXT NOT NULL,
+                    stock       INTEGER,
+                    delivery    TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS product_stock (
+                    product_id TEXT PRIMARY KEY,
+                    stock      INTEGER
+                );
+                """
+            )
+        else:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id           INTEGER PRIMARY KEY,
+                    balance           REAL NOT NULL DEFAULT 0,
+                    orders            INTEGER NOT NULL DEFAULT 0,
+                    language          TEXT NOT NULL DEFAULT 'en',
+                    referred_by       INTEGER,
+                    referrals          INTEGER NOT NULL DEFAULT 0,
+                    referral_earnings  REAL NOT NULL DEFAULT 0,
+                    deposits_count     INTEGER NOT NULL DEFAULT 0,
+                    referral_qualified INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS pending_deposits (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id       INTEGER NOT NULL,
+                    base_amount   REAL NOT NULL,
+                    unique_amount REAL NOT NULL,
+                    created_at    INTEGER NOT NULL,
+                    expires_at    INTEGER NOT NULL,
+                    status        TEXT NOT NULL DEFAULT 'pending',
+                    tx_hash       TEXT
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_pending_status
+                    ON pending_deposits(status);
+
+                CREATE TABLE IF NOT EXISTS orders (
+                    id           SERIAL PRIMARY KEY,
+                    user_id      INTEGER NOT NULL,
+                    product_id   TEXT NOT NULL,
+                    product_name TEXT NOT NULL,
+                    price        REAL NOT NULL,
+                    created_at   INTEGER NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_orders_user
+                    ON orders(user_id);
+
+                CREATE TABLE IF NOT EXISTS products (
+                    id          TEXT PRIMARY KEY,
+                    name        TEXT NOT NULL,
+                    price       REAL NOT NULL,
+                    description TEXT NOT NULL,
+                    stock       INTEGER,  -- NULL means unlimited
+                    delivery    TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS product_stock (
+                    product_id TEXT PRIMARY KEY,
+                    stock      INTEGER   -- NULL means unlimited
+                );
+                """
+            )
+
+        for col, ddl in [
+            ("language", "ALTER TABLE users ADD COLUMN language TEXT NOT NULL DEFAULT 'en'"),
+            ("referred_by", "ALTER TABLE users ADD COLUMN referred_by BIGINT" if IS_POSTGRES else "ALTER TABLE users ADD COLUMN referred_by INTEGER"),
+            ("referrals", "ALTER TABLE users ADD COLUMN referrals INTEGER NOT NULL DEFAULT 0"),
+            ("referral_earnings", "ALTER TABLE users ADD COLUMN referral_earnings DOUBLE PRECISION NOT NULL DEFAULT 0" if IS_POSTGRES else "ALTER TABLE users ADD COLUMN referral_earnings REAL NOT NULL DEFAULT 0"),
+            ("deposits_count", "ALTER TABLE users ADD COLUMN deposits_count INTEGER NOT NULL DEFAULT 0"),
+            ("referral_qualified", "ALTER TABLE users ADD COLUMN referral_qualified INTEGER NOT NULL DEFAULT 0"),
+        ]:
+            if not _column_exists(conn, "users", col):
+                _exec(conn, ddl)
+
+
+def ensure_user(user_id: int) -> None:
+    """Create a user row if it doesn't exist yet."""
+    with _lock, _connect() as conn:
+        _exec(
+            conn,
+            "INSERT INTO users (user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING",
+            (user_id,),
+        )
+
+
+def get_language(user_id: int) -> str:
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT language FROM users WHERE user_id = ?",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        return row["language"] if row else "en"
+
+
+def set_language(user_id: int, language: str) -> None:
+    with _lock, _connect() as conn:
+        _exec(
+            conn,
+            """
+            INSERT INTO users (user_id, language) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET language = EXCLUDED.language
+            """,
+            (user_id, language),
+        )
+
+
+def get_balance(user_id: int) -> float:
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT balance FROM users WHERE user_id = ?",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        return float(row["balance"]) if row else 0.0
+
+
+def get_user(user_id: int) -> dict:
+    """Return full profile info for a user (defaults if new)."""
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT balance, orders, language, referred_by, referrals, "
+            "referral_earnings, deposits_count FROM users WHERE user_id = ?",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        if row:
+            return {
+                "balance": float(row["balance"]),
+                "orders": int(row["orders"]),
+                "language": row["language"],
+                "referred_by": row["referred_by"],
+                "referrals": int(row["referrals"]),
+                "referral_earnings": float(row["referral_earnings"]),
+                "deposits_count": int(row["deposits_count"]),
+            }
+        return {
+            "balance": 0.0,
+            "orders": 0,
+            "language": "en",
+            "referred_by": None,
+            "referrals": 0,
+            "referral_earnings": 0.0,
+            "deposits_count": 0,
+        }
+
+
+def credit_balance(user_id: int, amount: float) -> float:
+    """Add `amount` to a user's balance, creating the row if needed. Returns new balance."""
+    with _lock, _connect() as conn:
+        _exec(
+            conn,
+            """
+            INSERT INTO users (user_id, balance) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET balance = users.balance + EXCLUDED.balance
+            """,
+            (user_id, amount),
+        )
+        cur = _exec(
+            conn,
+            "SELECT balance FROM users WHERE user_id = ?",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        return float(row["balance"])
+
+
+def set_referrer(user_id: int, referrer_id: int) -> bool:
+    if user_id == referrer_id:
+        return False
+    with _lock, _connect() as conn:
+        _exec(conn, "INSERT INTO users (user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", (user_id,))
+        cur = _exec(conn, "SELECT referred_by FROM users WHERE user_id = ?", (user_id,))
+        row = cur.fetchone()
+        if row and row["referred_by"] is not None:
+            return False  # already referred by someone
+        _exec(conn, "INSERT INTO users (user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", (referrer_id,))
+        _exec(
+            conn,
+            "UPDATE users SET referred_by = ? WHERE user_id = ?",
+            (referrer_id, user_id),
+        )
+        return True
+
+
+def reward_referrer_for_deposit(depositor_id: int, deposit_amount: float) -> dict | None:
+    with _lock, _connect() as conn:
+        _exec(conn, "INSERT INTO users (user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", (depositor_id,))
+        cur = _exec(
+            conn,
+            "SELECT referred_by, referral_qualified FROM users WHERE user_id = ?",
+            (depositor_id,),
+        )
+        row = cur.fetchone()
+        already_qualified = int(row["referral_qualified"]) if row else 0
+        referrer_id = row["referred_by"] if row else None
+
+        _exec(
+            conn,
+            "UPDATE users SET deposits_count = deposits_count + 1 WHERE user_id = ?",
+            (depositor_id,),
+        )
+
+        if referrer_id is None or deposit_amount < REFERRAL_MIN_DEPOSIT:
+            return None
+
+        reward = round(deposit_amount * REFERRAL_PERCENT, 2)
+        if reward <= 0:
+            return None
+
+        if not already_qualified:
+            _exec(
+                conn,
+                "UPDATE users SET referral_qualified = 1 WHERE user_id = ?",
+                (depositor_id,),
+            )
+            _exec(
+                conn,
+                "UPDATE users SET referrals = referrals + 1, "
+                "referral_earnings = referral_earnings + ?, "
+                "balance = balance + ? WHERE user_id = ?",
+                (reward, reward, referrer_id),
+            )
+        else:
+            _exec(
+                conn,
+                "UPDATE users SET referral_earnings = referral_earnings + ?, "
+                "balance = balance + ? WHERE user_id = ?",
+                (reward, reward, referrer_id),
+            )
+
+        cur_bal = _exec(
+            conn,
+            "SELECT balance FROM users WHERE user_id = ?",
+            (referrer_id,),
+        )
+        new_bal = cur_bal.fetchone()
+        return {
+            "referrer_id": referrer_id,
+            "reward": reward,
+            "new_referrer_balance": float(new_bal["balance"]) if new_bal else 0.0,
+        }
+
+
+def has_open_deposit(user_id: int) -> bool:
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT 1 FROM pending_deposits WHERE user_id = ? AND status = 'pending'",
+            (user_id,),
+        )
+        return cur.fetchone() is not None
+
+
+def unique_amount_taken(unique_amount: float) -> bool:
+    """True if another pending deposit already uses this exact amount."""
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT 1 FROM pending_deposits "
+            "WHERE status = 'pending' AND ROUND(unique_amount, 4) = ROUND(?, 4)",
+            (unique_amount,),
+        )
+        return cur.fetchone() is not None
+
+
+def create_pending_deposit(
+    user_id: int, base_amount: float, unique_amount: float, window_minutes: int
+) -> dict:
+    now = int(time.time())
+    expires = now + window_minutes * 60
+    with _lock, _connect() as conn:
+        if IS_POSTGRES:
+            cur = _exec(
+                conn,
+                """
+                INSERT INTO pending_deposits
+                    (user_id, base_amount, unique_amount, created_at, expires_at, status)
+                VALUES (?, ?, ?, ?, ?, 'pending')
+                RETURNING id
+                """,
+                (user_id, base_amount, unique_amount, now, expires),
+            )
+            inserted_id = cur.fetchone()["id"]
+        else:
+            cur = _exec(
+                conn,
+                """
+                INSERT INTO pending_deposits
+                    (user_id, base_amount, unique_amount, created_at, expires_at, status)
+                VALUES (?, ?, ?, ?, ?, 'pending')
+                """,
+                (user_id, base_amount, unique_amount, now, expires),
+            )
+            inserted_id = cur.lastrowid
+
+        return {
+            "id": inserted_id,
+            "user_id": user_id,
+            "base_amount": base_amount,
+            "unique_amount": unique_amount,
+            "expires_at": expires,
+        }
+
+
+def get_open_deposits() -> list:
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT * FROM pending_deposits WHERE status = 'pending'",
+        )
+        rows = cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+def mark_paid(deposit_id: int, tx_hash: str) -> None:
+    with _lock, _connect() as conn:
+        _exec(
+            conn,
+            "UPDATE pending_deposits SET status = 'paid', tx_hash = ? WHERE id = ?",
+            (tx_hash, deposit_id),
+        )
+
+
+def expire_old_deposits() -> None:
+    now = int(time.time())
+    with _lock, _connect() as conn:
+        _exec(
+            conn,
+            "UPDATE pending_deposits SET status = 'expired' "
+            "WHERE status = 'pending' AND expires_at < ?",
+            (now,),
+        )
+
+
+def seed_products(products: list) -> None:
+    with _lock, _connect() as conn:
+        for p in products:
+            _exec(
+                conn,
+                """
+                INSERT INTO products (id, name, price, description, stock, delivery)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (id) DO NOTHING
+                """,
+                (p["id"], p["name"], float(p["price"]), p["description"], p.get("stock"), p["delivery"]),
+            )
+            _exec(
+                conn,
+                """
+                INSERT INTO product_stock (product_id, stock) VALUES (?, ?)
+                ON CONFLICT (product_id) DO NOTHING
+                """,
+                (p["id"], p.get("stock")),
+            )
+
+
+def get_all_products() -> list:
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT id, name, price, description, stock, delivery FROM products",
+        )
+        rows = cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_product(product_id: str) -> dict | None:
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT id, name, price, description, stock, delivery FROM products WHERE id = ?",
+            (product_id,),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def add_product(
+    product_id: str,
+    name: str,
+    price: float,
+    description: str,
+    stock: int | None,
+    delivery: str,
+) -> None:
+    with _lock, _connect() as conn:
+        _exec(
+            conn,
+            """
+            INSERT INTO products (id, name, price, description, stock, delivery)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name = EXCLUDED.name,
+                price = EXCLUDED.price,
+                description = EXCLUDED.description,
+                stock = EXCLUDED.stock,
+                delivery = EXCLUDED.delivery
+            """,
+            (product_id, name, price, description, stock, delivery),
+        )
+        _exec(
+            conn,
+            """
+            INSERT INTO product_stock (product_id, stock) VALUES (?, ?)
+            ON CONFLICT(product_id) DO UPDATE SET stock = EXCLUDED.stock
+            """,
+            (product_id, stock),
+        )
+
+
+def seed_stock(products: list) -> None:
+    with _lock, _connect() as conn:
+        for p in products:
+            _exec(
+                conn,
+                "INSERT INTO product_stock (product_id, stock) VALUES (?, ?) ON CONFLICT (product_id) DO NOTHING",
+                (p["id"], p.get("stock")),
+            )
+
+
+def get_stock(product_id: str):
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT stock FROM product_stock WHERE product_id = ?",
+            (product_id,),
+        )
+        row = cur.fetchone()
+        if row:
+            return row["stock"]
+        pcur = _exec(
+            conn,
+            "SELECT stock FROM products WHERE id = ?",
+            (product_id,),
+        )
+        prow = pcur.fetchone()
+        return prow["stock"] if prow else None
+
+
+def set_stock(product_id: str, new_stock: int | None) -> bool:
+    with _lock, _connect() as conn:
+        p_row = _exec(conn, "SELECT 1 FROM products WHERE id = ?", (product_id,)).fetchone()
+        s_row = _exec(conn, "SELECT 1 FROM product_stock WHERE product_id = ?", (product_id,)).fetchone()
+
+        if not p_row and not s_row:
+            return False
+
+        if p_row:
+            _exec(
+                conn,
+                "UPDATE products SET stock = ? WHERE id = ?",
+                (new_stock, product_id),
+            )
+        _exec(
+            conn,
+            """
+            INSERT INTO product_stock (product_id, stock) VALUES (?, ?)
+            ON CONFLICT(product_id) DO UPDATE SET stock = EXCLUDED.stock
+            """,
+            (product_id, new_stock),
+        )
+        return True
+
+
+def adjust_stock(product_id: str, delta: int) -> tuple[bool, int | None]:
+    with _lock, _connect() as conn:
+        row = _exec(conn, "SELECT stock FROM product_stock WHERE product_id = ?", (product_id,)).fetchone()
+
+        if not row:
+            p_row = _exec(conn, "SELECT stock FROM products WHERE id = ?", (product_id,)).fetchone()
+            if not p_row:
+                return False, None
+            current_stock = p_row["stock"]
+        else:
+            current_stock = row["stock"]
+
+        if current_stock is None:
+            if delta >= 0:
+                new_stock = delta
+            else:
+                return False, None
+        else:
+            new_stock = max(0, current_stock + delta)
+
+        _exec(
+            conn,
+            "UPDATE products SET stock = ? WHERE id = ?",
+            (new_stock, product_id),
+        )
+        _exec(
+            conn,
+            """
+            INSERT INTO product_stock (product_id, stock) VALUES (?, ?)
+            ON CONFLICT(product_id) DO UPDATE SET stock = EXCLUDED.stock
+            """,
+            (product_id, new_stock),
+        )
+        return True, new_stock
+
+
+def purchase(user_id: int, product: dict) -> dict:
+    price = float(product["price"])
+    pid = product["id"]
+    now = int(time.time())
+
+    with _lock, _connect() as conn:
+        _exec(conn, "INSERT INTO users (user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", (user_id,))
+
+        srow = _exec(
+            conn,
+            "SELECT stock FROM product_stock WHERE product_id = ?",
+            (pid,),
+        ).fetchone()
+        stock = srow["stock"] if srow else product.get("stock")
+        if stock is not None and stock <= 0:
+            return {"ok": False, "reason": "out_of_stock"}
+
+        brow = _exec(
+            conn,
+            "SELECT balance FROM users WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        balance = float(brow["balance"]) if brow else 0.0
+        if balance < price:
+            return {
+                "ok": False,
+                "reason": "insufficient",
+                "balance": balance,
+                "price": price,
+            }
+
+        _exec(
+            conn,
+            "UPDATE users SET balance = balance - ?, orders = orders + 1 "
+            "WHERE user_id = ?",
+            (price, user_id),
+        )
+        if stock is not None:
+            _exec(
+                conn,
+                "UPDATE product_stock SET stock = stock - 1 WHERE product_id = ?",
+                (pid,),
+            )
+
+        if IS_POSTGRES:
+            cur = _exec(
+                conn,
+                "INSERT INTO orders (user_id, product_id, product_name, price, created_at) "
+                "VALUES (?, ?, ?, ?, ?) RETURNING id",
+                (user_id, pid, product["name"], price, now),
+            )
+            order_id = cur.fetchone()["id"]
+        else:
+            cur = _exec(
+                conn,
+                "INSERT INTO orders (user_id, product_id, product_name, price, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (user_id, pid, product["name"], price, now),
+            )
+            order_id = cur.lastrowid
+
+        new_balance = balance - price
+        return {"ok": True, "order_id": order_id, "new_balance": new_balance}
+
+
+def get_orders(user_id: int, limit: int = 10) -> list:
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT id, product_name, price, created_at FROM orders "
+            "WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+            (user_id, limit),
+        )
+        rows = cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+def count_orders(user_id: int) -> int:
+    with _connect() as conn:
+        cur = _exec(
+            conn,
+            "SELECT COUNT(*) AS c FROM orders WHERE user_id = ?",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        return int(row["c"]) if row else 0
