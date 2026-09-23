@@ -308,19 +308,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def send_add_product_guidance(update: Update) -> None:
     guidance = (
         "🛠 <b>Admin Product Addition Guidance</b>\n\n"
-        "Naya product add karne ke liye niche diye gaye format me command bhejein:\n\n"
-        "<b>Syntax / Format:</b>\n"
-        "<code>/addproduct id | name | price | description | stock | delivery</code>\n\n"
-        "<b>Parameters Detail:</b>\n"
-        "1️⃣ <b>id</b>: Unique ID (letters, numbers, underscore. e.g. <code>netflix_1m</code>)\n"
-        "2️⃣ <b>name</b>: Shop me dikhne wala naam (e.g. <code>🎬 Netflix Premium — 1 Month</code>)\n"
-        "3️⃣ <b>price</b>: USD price (e.g. <code>5.00</code> ya <code>10</code>)\n"
-        "4️⃣ <b>description</b>: Product description (HTML supported)\n"
-        "5️⃣ <b>stock</b>: Available stock quantity (e.g. <code>20</code> ya <code>unlimited</code>)\n"
-        "6️⃣ <b>delivery</b>: Buy hone par customer ko bheja jane wala detail/code/message\n\n"
-        "<b>Example Command:</b>\n"
-        "<code>/addproduct netflix_1m | 🎬 Netflix Premium (1 Month) | 5.00 | 4K Ultra HD Private Account | 20 | Login Email: user@example.com / Password: pass123</code>\n\n"
-        "<i>Note: Har parameter ke bich me <b>|</b> (pipe) symbol hona zaroori hai.</i>"
+        "Naya product add karne ke liye format:\n\n"
+        "<b>Format:</b>\n"
+        "<code>/addproduct id | name | price | description</code>\n\n"
+        "<b>Example:</b>\n"
+        "<code>/addproduct chatgptplus_1m | 🤖 ChatGPT Plus (1 Month) | 8.00 | Mobile & PC Access</code>\n\n"
+        "💡 <i>Product add karte time Login/Password nahi mangega!</i>\n"
+        "<i>Product add karne ke baad Accounts/Password stock me daalne ke liye <b>/addstock</b> command use karein.</i>"
     )
     await update.message.reply_text(guidance, parse_mode="HTML")
 
@@ -351,25 +345,31 @@ async def add_product_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await send_add_product_guidance(update)
         return
 
-    # Parse parameters separated by '|' (maximum 6 parts)
-    parts = [p.strip() for p in args_text.split("|", 5)]
-    if len(parts) < 6:
+    # Parse parameters separated by '|'
+    parts = [p.strip() for p in args_text.split("|")]
+    if len(parts) < 4:
         await update.message.reply_text(
             "⚠️ <b>Invalid Format!</b>\n\n"
-            "Product add karne ke liye sabhi 6 parameters (pipe <code>|</code> se separated) zaroori hain.\n\n"
+            "Product add karne ke liye kam se kam 4 parameters (pipe <code>|</code> se separated) zaroori hain:\n\n"
             "<b>Format:</b>\n"
-            "<code>/addproduct id | name | price | description | stock | delivery</code>\n\n"
-            "Guidance dekhne ke liye type karein: <code>/addproduct</code>",
+            "<code>/addproduct id | name | price | description</code>\n\n"
+            "<b>Example:</b>\n"
+            "<code>/addproduct chatgptplus_1m | 🤖 ChatGPT Plus (1 Month) | 8.00 | Mobile & PC Access</code>",
             parse_mode="HTML",
         )
         return
 
-    prod_id, name, price_str, description, stock_str, delivery = parts
+    prod_id = parts[0]
+    name = parts[1]
+    price_str = parts[2]
+    description = parts[3]
+    stock_str = parts[4] if len(parts) > 4 else "0"
+    delivery = parts[5] if len(parts) > 5 else "Accounts delivered automatically upon purchase"
 
     # Validate Product ID
     if not prod_id or not all(c.isalnum() or c == "_" for c in prod_id):
         await update.message.reply_text(
-            "❌ <b>Invalid Product ID!</b>\nID me sirf letters, numbers aur underscores (<code>_</code>) allowed hain (e.g. <code>netflix_1m</code>).",
+            "❌ <b>Invalid Product ID!</b>\nID me sirf letters, numbers aur underscores (<code>_</code>) allowed hain (e.g. <code>chatgptplus_1m</code>).",
             parse_mode="HTML",
         )
         return
@@ -381,7 +381,7 @@ async def add_product_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             raise ValueError
     except ValueError:
         await update.message.reply_text(
-            "❌ <b>Invalid Price!</b> Price numeric number hona chahiye (e.g. <code>5.00</code> ya <code>10</code>).",
+            "❌ <b>Invalid Price!</b> Price numeric number hona chahiye (e.g. <code>8.00</code> ya <code>10</code>).",
             parse_mode="HTML",
         )
         return
@@ -394,15 +394,11 @@ async def add_product_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             if stock < 0:
                 stock = None
         except ValueError:
-            await update.message.reply_text(
-                "❌ <b>Invalid Stock!</b> Stock quantity number (e.g. <code>50</code>) ya <code>unlimited</code> hona chahiye.",
-                parse_mode="HTML",
-            )
-            return
+            stock = 0
 
-    if not name or not description or not delivery:
+    if not name or not description:
         await update.message.reply_text(
-            "❌ <b>Missing Fields!</b> Name, Description aur Delivery empty nahi ho sakte.",
+            "❌ <b>Missing Fields!</b> Name aur Description empty nahi ho sakte.",
             parse_mode="HTML",
         )
         return
@@ -417,15 +413,18 @@ async def add_product_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         delivery=delivery,
     )
 
-    stock_display = "Unlimited" if stock is None else str(stock)
+    stock_count = db.get_stock(prod_id)
+    stock_display = "Unlimited" if stock_count is None else str(stock_count)
+
     success_msg = (
         f"✅ <b>Product Successfully Added!</b>\n\n"
         f"🆔 <b>ID:</b> <code>{html.escape(prod_id)}</code>\n"
         f"📦 <b>Name:</b> {html.escape(name)}\n"
         f"💵 <b>Price:</b> ${price:.2f}\n"
         f"📊 <b>Stock:</b> {stock_display}\n"
-        f"📝 <b>Description:</b> {html.escape(description)}\n"
-        f"🚚 <b>Delivery:</b> {html.escape(delivery)}"
+        f"📝 <b>Description:</b> {html.escape(description)}\n\n"
+        f"💡 <b>Accounts / Password Stock Add Karne Ke Liye:</b>\n"
+        f"<code>/addstock {html.escape(prod_id)} email:password</code>"
     )
     await update.message.reply_text(success_msg, parse_mode="HTML")
 
@@ -451,16 +450,17 @@ async def send_stock_guidance(update: Update) -> None:
     guidance = (
         f"📊 <b>Current Stock Status:</b>\n\n"
         f"{stocks_msg}\n\n"
-        f"🛠 <b>Stock Management Commands & Guidance:</b>\n\n"
-        f"<b>1️⃣ Specific Quantity Set Karna:</b>\n"
-        f"<code>/setstock &lt;product_id&gt; &lt;quantity&gt;</code>\n"
-        f"Example: <code>/setstock netflix_1m 50</code>\n\n"
-        f"<b>2️⃣ Unlimited Stock Set Karna:</b>\n"
-        f"<code>/setstock &lt;product_id&gt; unlimited</code>\n"
-        f"Example: <code>/setstock netflix_1m unlimited</code>\n\n"
-        f"<b>3️⃣ Stock Add ya Deduct Karna:</b>\n"
-        f"<code>/setstock &lt;product_id&gt; +10</code> (10 add karega)\n"
-        f"<code>/setstock &lt;product_id&gt; -5</code> (5 reduce karega)"
+        f"🛠 <b>Stock & Accounts Add Karne Ka Format:</b>\n\n"
+        f"<b>1️⃣ Ek Account Add Karna:</b>\n"
+        f"<code>/addstock &lt;product_id&gt; email:password</code>\n"
+        f"Example: <code>/addstock chatgptplus_1m user@example.com:pass123</code>\n\n"
+        f"<b>2️⃣ Multiple Accounts Ek Saath Add Karna:</b>\n"
+        f"<code>/addstock &lt;product_id&gt;\n"
+        f"email1@gmail.com:pass1\n"
+        f"email2@gmail.com:pass2\n"
+        f"email3@gmail.com:pass3</code>\n\n"
+        f"<b>3️⃣ Numeric Stock Quantity Set Karna:</b>\n"
+        f"<code>/setstock &lt;product_id&gt; 50</code>"
     )
     await update.message.reply_text(guidance, parse_mode="HTML")
 
@@ -487,12 +487,14 @@ async def stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     args_str = parts_cmd[1].strip()
-    args = args_str.split()
-    if not args or args[0].lower() in ["help", "guidance"]:
+    if not args_str or args_str.lower() in ["help", "guidance"]:
         await send_stock_guidance(update)
         return
 
-    prod_id = args[0].strip()
+    lines = [l.strip() for l in args_str.splitlines() if l.strip()]
+    first_line_parts = lines[0].split(None, 1)
+    prod_id = first_line_parts[0].strip()
+
     product = catalog.get_product(prod_id)
     if not product:
         await update.message.reply_text(
@@ -501,33 +503,66 @@ async def stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
-    # If only 1 argument provided, show current stock for that product
-    if len(args) == 1:
-        s = db.get_stock(prod_id)
-        s_text = "Unlimited" if s is None else str(s)
+    account_lines = []
+    if len(first_line_parts) > 1:
+        account_lines.append(first_line_parts[1].strip())
+    if len(lines) > 1:
+        account_lines.extend(lines[1:])
+
+    # Check if it's a numeric quantity update like /setstock netflix_1m 50 or /setstock netflix_1m +10
+    if len(account_lines) == 1 and (account_lines[0].replace("+", "").replace("-", "").isdigit()):
+        val = account_lines[0]
+        if val.startswith("+") or val.startswith("-"):
+            try:
+                delta = int(val)
+                ok, new_st = db.adjust_stock(prod_id, delta)
+                st_lbl = "Unlimited" if new_st is None else str(new_st)
+                await update.message.reply_text(
+                    f"✅ <b>Stock Updated!</b>\n"
+                    f"🆔 <b>Product:</b> <code>{html.escape(prod_id)}</code>\n"
+                    f"📊 <b>New Stock:</b> {st_lbl}",
+                    parse_mode="HTML",
+                )
+                return
+            except ValueError:
+                pass
+        else:
+            try:
+                new_st = int(val)
+                db.set_stock(prod_id, new_st)
+                await update.message.reply_text(
+                    f"✅ <b>Stock Set!</b>\n"
+                    f"🆔 <b>Product:</b> <code>{html.escape(prod_id)}</code>\n"
+                    f"📊 <b>New Stock:</b> {new_st}",
+                    parse_mode="HTML",
+                )
+                return
+            except ValueError:
+                pass
+    elif len(account_lines) == 1 and account_lines[0].lower() in ["unlimited", "none", "null"]:
+        db.set_stock(prod_id, None)
         await update.message.reply_text(
-            f"📦 <b>Product:</b> {html.escape(product['name'])}\n"
-            f"🆔 <b>ID:</b> <code>{html.escape(prod_id)}</code>\n"
-            f"📊 <b>Current Stock:</b> <b>{s_text}</b>\n\n"
-            f"Stock change karne ke liye syntax:\n"
-            f"<code>/setstock {html.escape(prod_id)} 50</code>\n"
-            f"<code>/setstock {html.escape(prod_id)} unlimited</code>\n"
-            f"<code>/setstock {html.escape(prod_id)} +10</code>",
+            f"✅ <b>Stock Set to Unlimited!</b>\n"
+            f"🆔 <b>Product:</b> <code>{html.escape(prod_id)}</code>",
             parse_mode="HTML",
         )
         return
 
-    val = args[1].strip()
+    if not account_lines:
+        await send_stock_guidance(update)
+        return
 
-    # Relative adjustment e.g. +10 or -5
-    if val.startswith("+") or (val.startswith("-") and val[1:].isdigit()):
-        try:
-            delta = int(val)
-        except ValueError:
-            await update.message.reply_text("❌ Invalid number format.", parse_mode="HTML")
-            return
+    # Add accounts to stock
+    added_count = db.add_accounts_to_stock(prod_id, account_lines)
+    total_stock = db.get_stock(prod_id)
 
-        success, new_stock = db.adjust_stock(prod_id, delta)
+    await update.message.reply_text(
+        f"✅ <b>Successfully Added {added_count} Account(s) to Stock!</b>\n\n"
+        f"🆔 <b>Product ID:</b> <code>{html.escape(prod_id)}</code>\n"
+        f"📊 <b>Total Stock Available:</b> {total_stock}\n\n"
+        f"<i>Kharidne par customer ko ek-ek karke account details milti rahengi!</i>",
+        parse_mode="HTML",
+    )
         if not success:
             await update.message.reply_text("❌ Stock update fail ho gaya.", parse_mode="HTML")
             return
@@ -1038,6 +1073,8 @@ def main() -> None:
     application.add_handler(CommandHandler("stock", stock_command))
     application.add_handler(CommandHandler("setstock", stock_command))
     application.add_handler(CommandHandler("addstock", stock_command))
+    application.add_handler(CommandHandler("addaccounts", stock_command))
+    application.add_handler(CommandHandler("add_accounts", stock_command))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_deposit_amount)

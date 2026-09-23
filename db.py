@@ -1,5 +1,5 @@
 """
-Database storage for user balances, language, referrals, pending deposits and orders.
+Database storage for user balances, language, referrals, pending deposits, orders and stock accounts.
 Supports both PostgreSQL (via Neon / DATABASE_URL env var) and local SQLite (bot.db fallback).
 """
 
@@ -132,6 +132,17 @@ def init_db() -> None:
                     product_id TEXT PRIMARY KEY,
                     stock      INTEGER
                 );
+
+                CREATE TABLE IF NOT EXISTS product_accounts (
+                    id            SERIAL PRIMARY KEY,
+                    product_id    TEXT NOT NULL,
+                    account_data  TEXT NOT NULL,
+                    is_sold       INTEGER NOT NULL DEFAULT 0,
+                    created_at    BIGINT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_accounts_prod_sold
+                    ON product_accounts(product_id, is_sold);
                 """
             )
         else:
@@ -188,6 +199,17 @@ def init_db() -> None:
                     product_id TEXT PRIMARY KEY,
                     stock      INTEGER   -- NULL means unlimited
                 );
+
+                CREATE TABLE IF NOT EXISTS product_accounts (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    product_id    TEXT NOT NULL,
+                    account_data  TEXT NOT NULL,
+                    is_sold       INTEGER NOT NULL DEFAULT 0,
+                    created_at    INTEGER NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_accounts_prod_sold
+                    ON product_accounts(product_id, is_sold);
                 """
             )
 
@@ -466,6 +488,53 @@ def expire_old_deposits() -> None:
         )
 
 
+# --- Account Inventory Stock System -----------------------------------------
+def add_accounts_to_stock(product_id: str, accounts: list[str]) -> int:
+    """
+    Add account credential lines (e.g. ['email1:pass1', 'email2:pass2']) to product_accounts inventory.
+    Returns count of added accounts.
+    """
+    if not accounts:
+        return 0
+    now = int(time.time())
+    count = 0
+    with _lock, _connect() as conn:
+        for acc in accounts:
+            acc = acc.strip()
+            if acc:
+                _exec(
+                    conn,
+                    "INSERT INTO product_accounts (product_id, account_data, is_sold, created_at) VALUES (?, ?, 0, ?)",
+                    (product_id, acc, now),
+                )
+                count += 1
+
+        # Sync stock count
+        s_cur = _exec(
+            conn,
+            "SELECT COUNT(*) AS c FROM product_accounts WHERE product_id = ? AND is_sold = 0",
+            (product_id,),
+        )
+        s_row = s_cur.fetchone()
+        new_stock = int(s_row["c"]) if s_row else 0
+
+        _exec(
+            conn,
+            "UPDATE products SET stock = ? WHERE id = ?",
+            (new_stock, product_id),
+        )
+        _exec(
+            conn,
+            """
+            INSERT INTO product_stock (product_id, stock) VALUES (?, ?)
+            ON CONFLICT(product_id) DO UPDATE SET stock = EXCLUDED.stock
+            """,
+            (product_id, new_stock),
+        )
+    return count
+
+
+# --- Product catalog & stock --------------------------------------------------
 def seed_products(products: list) -> None:
     with _lock, _connect() as conn:
         for p in products:
@@ -476,7 +545,7 @@ def seed_products(products: list) -> None:
                 VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO NOTHING
                 """,
-                (p["id"], p["name"], float(p["price"]), p["description"], p.get("stock"), p["delivery"]),
+                (p["id"], p["name"], float(p["price"]), p["description"], p.get("stock"), p.get("delivery", "")),
             )
             _exec(
                 conn,
@@ -514,8 +583,8 @@ def add_product(
     name: str,
     price: float,
     description: str,
-    stock: int | None,
-    delivery: str,
+    stock: int | None = 0,
+    delivery: str = "",
 ) -> None:
     with _lock, _connect() as conn:
         _exec(
@@ -554,14 +623,34 @@ def seed_stock(products: list) -> None:
 
 def get_stock(product_id: str):
     with _connect() as conn:
+        # 1. If product has account inventory in product_accounts, use unsold count
         cur = _exec(
+            conn,
+            "SELECT COUNT(*) AS c FROM product_accounts WHERE product_id = ? AND is_sold = 0",
+            (product_id,),
+        )
+        row = cur.fetchone()
+        acc_count = int(row["c"]) if row else 0
+
+        tot_cur = _exec(
+            conn,
+            "SELECT 1 FROM product_accounts WHERE product_id = ? LIMIT 1",
+            (product_id,),
+        )
+        if tot_cur.fetchone() is not None:
+            return acc_count
+
+        # 2. Otherwise check product_stock table
+        st_cur = _exec(
             conn,
             "SELECT stock FROM product_stock WHERE product_id = ?",
             (product_id,),
         )
-        row = cur.fetchone()
-        if row:
-            return row["stock"]
+        st_row = st_cur.fetchone()
+        if st_row and st_row["stock"] is not None:
+            return st_row["stock"]
+
+        # 3. Fallback to products table
         pcur = _exec(
             conn,
             "SELECT stock FROM products WHERE id = ?",
@@ -632,6 +721,7 @@ def adjust_stock(product_id: str, delta: int) -> tuple[bool, int | None]:
         return True, new_stock
 
 
+# --- Purchases / orders -----------------------------------------------------
 def purchase(user_id: int, product: dict) -> dict:
     price = float(product["price"])
     pid = product["id"]
@@ -640,12 +730,23 @@ def purchase(user_id: int, product: dict) -> dict:
     with _lock, _connect() as conn:
         _exec(conn, "INSERT INTO users (user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", (user_id,))
 
-        srow = _exec(
+        # Check for available account in product_accounts
+        acc_cur = _exec(
             conn,
-            "SELECT stock FROM product_stock WHERE product_id = ?",
+            "SELECT id, account_data FROM product_accounts WHERE product_id = ? AND is_sold = 0 ORDER BY id ASC LIMIT 1",
             (pid,),
-        ).fetchone()
-        stock = srow["stock"] if srow else product.get("stock")
+        )
+        acc_row = acc_cur.fetchone()
+
+        if acc_row:
+            acc_id = acc_row["id"]
+            delivery_text = acc_row["account_data"]
+        else:
+            acc_id = None
+            delivery_text = product.get("delivery") or "Digital Item"
+
+        # Check stock
+        stock = get_stock(pid)
         if stock is not None and stock <= 0:
             return {"ok": False, "reason": "out_of_stock"}
 
@@ -663,18 +764,30 @@ def purchase(user_id: int, product: dict) -> dict:
                 "price": price,
             }
 
+        # Deduct balance + count order
         _exec(
             conn,
-            "UPDATE users SET balance = balance - ?, orders = orders + 1 "
-            "WHERE user_id = ?",
+            "UPDATE users SET balance = balance - ?, orders = orders + 1 WHERE user_id = ?",
             (price, user_id),
         )
-        if stock is not None:
+
+        if acc_id is not None:
             _exec(
                 conn,
-                "UPDATE product_stock SET stock = stock - 1 WHERE product_id = ?",
+                "UPDATE product_accounts SET is_sold = 1 WHERE id = ?",
+                (acc_id,),
+            )
+            cnt_cur = _exec(
+                conn,
+                "SELECT COUNT(*) AS c FROM product_accounts WHERE product_id = ? AND is_sold = 0",
                 (pid,),
             )
+            new_st = int(cnt_cur.fetchone()["c"])
+            _exec(conn, "UPDATE products SET stock = ? WHERE id = ?", (new_st, pid))
+            _exec(conn, "UPDATE product_stock SET stock = ? WHERE product_id = ?", (new_st, pid))
+        elif stock is not None:
+            _exec(conn, "UPDATE product_stock SET stock = stock - 1 WHERE product_id = ?", (pid,))
+            _exec(conn, "UPDATE products SET stock = stock - 1 WHERE id = ?", (pid,))
 
         if IS_POSTGRES:
             cur = _exec(
@@ -694,7 +807,12 @@ def purchase(user_id: int, product: dict) -> dict:
             order_id = cur.lastrowid
 
         new_balance = balance - price
-        return {"ok": True, "order_id": order_id, "new_balance": new_balance}
+        return {
+            "ok": True,
+            "order_id": order_id,
+            "new_balance": new_balance,
+            "delivery": delivery_text,
+        }
 
 
 def get_orders(user_id: int, limit: int = 10) -> list:
