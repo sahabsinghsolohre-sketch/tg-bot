@@ -1083,6 +1083,29 @@ async def poll_deposits(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Fake stock decay / reset jobs
+# ---------------------------------------------------------------------------
+async def decay_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Drop stock by 3-4 units every 5 minutes to create urgency."""
+    prods = catalog.all_products()
+    for p in prods:
+        stock = db.get_stock(p["id"])
+        if stock is None or stock <= 0:
+            continue
+        drop = random.randint(3, 4)
+        new_stock = max(0, stock - drop)
+        db.set_stock(p["id"], new_stock)
+
+
+async def reset_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reset all product stock to 100 every 24 hours."""
+    prods = catalog.all_products()
+    for p in prods:
+        db.set_stock(p["id"], 100)
+    logger.info("Stock reset to 100 for all products.")
+
+
+# ---------------------------------------------------------------------------
 # App bootstrap
 # ---------------------------------------------------------------------------
 def start_health_check_server() -> None:
@@ -1149,6 +1172,10 @@ def main() -> None:
     )
 
     application.job_queue.run_repeating(poll_deposits, interval=POLL_INTERVAL, first=10)
+    # Fake stock decay: drop 3-4 units every 5 minutes to create urgency.
+    application.job_queue.run_repeating(decay_stock, interval=300, first=60)
+    # Reset all fake stock to 100 every 24 hours.
+    application.job_queue.run_repeating(reset_stock, interval=86400, first=86400)
 
     logger.info("Bot is starting... Press Ctrl+C to stop.")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
