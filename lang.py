@@ -65,7 +65,9 @@ TRANSLATIONS = {
             "💰 Enter the amount to deposit (in USDT)\n"
             "📉 Min <b>${min:.0f}</b>  •  📈 Max <b>${max:,.0f}</b>"
             "</blockquote>\n\n"
-            "👉 Just type a number, e.g. <code>25</code>"
+            "👉 Just type a number, e.g. <code>25</code>\n\n"
+            "💳 <b>Other payment methods?</b>\n"
+            "Contact <b>@NarayaniAdmin</b> for UPI, Bank Transfer or other options."
         ),
         "deposit_not_number": (
             "❌ That doesn't look like a number. Please type an amount like "
@@ -144,7 +146,8 @@ TRANSLATIONS = {
         "help": (
             "ℹ️ <b>Help &amp; commands</b>\n\n"
             "/start — Open the main menu\n"
-            "/help — Show this help message\n\n"
+            "/help — Show this help message\n"
+            "/privacy — View our Privacy Policy\n\n"
             "Use the buttons on the menu to shop, deposit, view your profile, "
             "get support, or refer friends. 👇"
         ),
@@ -163,9 +166,10 @@ TRANSLATIONS = {
         "btn_back_shop": "⬅️ Back to shop",
         "btn_deposit_now": "💵 Deposit now",
         "shop_list": (
-            "🛍 <b>Shop</b>\n\n"
+            "🛍 <b>Shop — Premium Digital Subscriptions</b>\n\n"
+            "💎 <i>Best prices. Instant delivery. Trusted service.</i>\n\n"
             "👛 Your balance: <b>${balance:.2f}</b>\n\n"
-            "Choose a product below to see details and buy. 👇"
+            "Select a product below to view details and purchase. 👇"
         ),
         "shop_empty": (
             "🛍 <b>Shop</b>\n\n"
@@ -174,16 +178,19 @@ TRANSLATIONS = {
         "product_detail": (
             "🛍 <b>{name}</b>\n\n"
             "{description}\n\n"
-            "💵 Price: <b>${price:.2f}</b>\n"
-            "📦 Stock: <b>{stock}</b>\n"
-            "👛 Your balance: <b>${balance:.2f}</b>"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💵  Your price:   <b>${price:.2f}</b>\n"
+            "📦  In stock:     <b>{stock}</b>\n"
+            "👛  Your balance: <b>${balance:.2f}</b>"
         ),
         "confirm_purchase": (
-            "🧾 <b>Confirm your purchase</b>\n\n"
-            "🛍 Product: <b>{name}</b>\n"
-            "💵 Price: <b>${price:.2f}</b>\n"
-            "👛 Balance after: <b>${after:.2f}</b>\n\n"
-            "Tap <b>Confirm purchase</b> to proceed."
+            "🧾 <b>Confirm your order</b>\n\n"
+            "<blockquote>"
+            "🛍  Product:        <b>{name}</b>\n"
+            "💵  Amount:         <b>${price:.2f}</b>\n"
+            "👛  Balance after: <b>${after:.2f}</b>"
+            "</blockquote>\n\n"
+            "Tap <b>Confirm purchase</b> to complete your order. ✅"
         ),
         "insufficient": (
             "❌ <b>Not enough balance</b>\n\n"
@@ -251,7 +258,9 @@ TRANSLATIONS = {
             "💰 डिपॉज़िट की रकम लिखें (USDT में)\n"
             "📉 न्यूनतम <b>${min:.0f}</b>  •  📈 अधिकतम <b>${max:,.0f}</b>"
             "</blockquote>\n\n"
-            "👉 बस एक नंबर लिखें, जैसे <code>25</code>"
+            "👉 बस एक नंबर लिखें, जैसे <code>25</code>\n\n"
+            "💳 <b>दूसरे पेमेंट तरीके?</b>\n"
+            "UPI, Bank Transfer या अन्य के लिए <b>@NarayaniAdmin</b> से संपर्क करें।"
         ),
         "deposit_not_number": (
             "❌ यह कोई नंबर नहीं लग रहा। कृपया रकम ऐसे लिखें, जैसे <code>25</code>।"

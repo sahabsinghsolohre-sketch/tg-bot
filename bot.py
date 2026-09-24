@@ -302,6 +302,52 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(t("help", lang), parse_mode="HTML")
 
 
+async def privacy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send the Privacy Policy."""
+    await update.message.reply_text(
+        "🔒 <b>Privacy Policy — Narayani Shop</b>\n\n"
+
+        "<b>1. Data We Collect</b>\n"
+        "We collect only what is necessary to operate the bot:\n"
+        "• Your Telegram User ID and first name (provided by Telegram)\n"
+        "• Your wallet balance and transaction history within the bot\n"
+        "• Your preferred language setting\n"
+        "• Referral relationships (who invited whom)\n\n"
+
+        "<b>2. How We Use Your Data</b>\n"
+        "• To process deposits and credit your balance\n"
+        "• To fulfil product orders and deliver credentials\n"
+        "• To calculate and pay referral rewards\n"
+        "• To display your profile, order history and balance\n\n"
+
+        "<b>3. Data Sharing</b>\n"
+        "We do <b>not</b> sell, share or disclose your personal data to "
+        "any third party. Your data is stored securely and accessed only "
+        "by the bot and its administrator.\n\n"
+
+        "<b>4. Payments</b>\n"
+        "Deposits are made via USDT (BEP20) on Binance Smart Chain. "
+        "We do not store your private keys, seed phrases or any wallet "
+        "credentials. Transactions on the blockchain are public and "
+        "irreversible by nature.\n\n"
+
+        "<b>5. Security</b>\n"
+        "All data is stored in an encrypted database. We take reasonable "
+        "measures to protect your information, but no system is 100% secure. "
+        "Never share your wallet private key with anyone.\n\n"
+
+        "<b>6. Data Retention</b>\n"
+        "Your data is retained for as long as your account is active. "
+        "To request deletion, contact us at <b>@NarayaniAdmin</b>.\n\n"
+
+        "<b>7. Contact</b>\n"
+        "For any privacy-related queries, reach us at <b>@NarayaniAdmin</b>.\n\n"
+
+        "<i>Last updated: September 2026</i>",
+        parse_mode="HTML",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Admin product addition flow
 # ---------------------------------------------------------------------------
@@ -321,18 +367,8 @@ async def send_add_product_guidance(update: Update) -> None:
 
 async def add_product_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not user:
-        return
-    if not is_admin(user.id):
-        await update.message.reply_text(
-            f"❌ <b>Unauthorized Admin Command</b>\n\n"
-            f"Your Telegram User ID is: <code>{user.id}</code>\n\n"
-            f"This ID is not listed in <code>ADMIN_ID</code> on Render.\n"
-            f"Please go to Render Dashboard -> Environment Variables and set:\n"
-            f"<b>ADMIN_ID</b> = <code>{user.id}</code>",
-            parse_mode="HTML",
-        )
-        return
+    if not user or not is_admin(user.id):
+        return  # silently ignore non-admins
 
     full_text = update.message.text or ""
     parts_cmd = full_text.split(None, 1)
@@ -423,192 +459,227 @@ async def add_product_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"💵 <b>Price:</b> ${price:.2f}\n"
         f"📊 <b>Stock:</b> {stock_display}\n"
         f"📝 <b>Description:</b> {html.escape(description)}\n\n"
-        f"💡 <b>Accounts / Password Stock Add Karne Ke Liye:</b>\n"
-        f"<code>/addstock {html.escape(prod_id)} email:password</code>"
+        f"💡 <b>Stock / Accounts Add Karne Ke Liye:</b>\n"
+        f"<code>/editproduct {html.escape(prod_id)} account email:password</code>"
     )
     await update.message.reply_text(success_msg, parse_mode="HTML")
 
 
 # ---------------------------------------------------------------------------
-# Admin product stock management flow
+# Admin /editproduct — manage stock & accounts
 # ---------------------------------------------------------------------------
-async def send_stock_guidance(update: Update) -> None:
+async def send_editproduct_guidance(update: Update) -> None:
     prods = catalog.all_products()
-    stock_lines = []
+    lines = []
     if not prods:
-        stock_lines.append("<i>Catalog me koi product nahi hai.</i>")
+        lines.append("<i>Abhi koi product nahi hai. Pehle /addproduct se add karo.</i>")
     else:
         for idx, p in enumerate(prods, 1):
             s = db.get_stock(p["id"])
             s_text = "<b>Unlimited</b>" if s is None else f"<b>{s}</b>"
-            stock_lines.append(
-                f"{idx}. {html.escape(p['name'])} (<code>{html.escape(p['id'])}</code>): {s_text}"
+            lines.append(
+                f"{idx}. {html.escape(p['name'])}\n"
+                f"   🆔 <code>{html.escape(p['id'])}</code>  📦 Stock: {s_text}"
             )
 
-    stocks_msg = "\n".join(stock_lines)
-
     guidance = (
-        f"📊 <b>Current Stock Status:</b>\n\n"
-        f"{stocks_msg}\n\n"
-        f"🛠 <b>Stock & Accounts Add Karne Ka Format:</b>\n\n"
-        f"<b>1️⃣ Ek Account Add Karna:</b>\n"
-        f"<code>/addstock &lt;product_id&gt; email:password</code>\n"
-        f"Example: <code>/addstock chatgptplus_1m user@example.com:pass123</code>\n\n"
-        f"<b>2️⃣ Multiple Accounts Ek Saath Add Karna:</b>\n"
-        f"<code>/addstock &lt;product_id&gt;\n"
-        f"email1@gmail.com:pass1\n"
-        f"email2@gmail.com:pass2\n"
-        f"email3@gmail.com:pass3</code>\n\n"
-        f"<b>3️⃣ Numeric Stock Quantity Set Karna:</b>\n"
-        f"<code>/setstock &lt;product_id&gt; 50</code>"
+        "🛠 <b>/editproduct — Product Manager</b>\n\n"
+        "<b>Current products:</b>\n"
+        + "\n\n".join(lines)
+        + "\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<b>📦 Stock set karna:</b>\n"
+        "<code>/editproduct &lt;id&gt; stock 50</code>\n"
+        "<code>/editproduct &lt;id&gt; stock unlimited</code>\n"
+        "<code>/editproduct &lt;id&gt; stock +10</code>  (add)\n"
+        "<code>/editproduct &lt;id&gt; stock -5</code>   (reduce)\n\n"
+        "<b>🔑 Accounts add karna:</b>\n"
+        "<code>/editproduct &lt;id&gt; account email:pass</code>\n\n"
+        "<b>Multiple accounts (ek saath):</b>\n"
+        "<code>/editproduct &lt;id&gt; account\n"
+        "email1:pass1\n"
+        "email2:pass2</code>\n\n"
+        "<b>🗑 Product remove karna:</b>\n"
+        "<code>/removeproduct &lt;id&gt;</code>"
     )
     await update.message.reply_text(guidance, parse_mode="HTML")
 
 
-async def stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def editproduct_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not user:
-        return
-    if not is_admin(user.id):
-        await update.message.reply_text(
-            f"❌ <b>Unauthorized Admin Command</b>\n\n"
-            f"Your Telegram User ID is: <code>{user.id}</code>\n\n"
-            f"This ID is not listed in <code>ADMIN_ID</code> on Render.\n"
-            f"Please go to Render Dashboard -> Environment Variables and set:\n"
-            f"<b>ADMIN_ID</b> = <code>{user.id}</code>",
-            parse_mode="HTML",
-        )
-        return
+    if not user or not is_admin(user.id):
+        return  # silently ignore non-admins
 
-    full_text = update.message.text or ""
+    full_text = (update.message.text or "").strip()
+    # strip command prefix, handle /editproduct@BotName
     parts_cmd = full_text.split(None, 1)
     if len(parts_cmd) < 2:
-        await send_stock_guidance(update)
+        await send_editproduct_guidance(update)
         return
 
     args_str = parts_cmd[1].strip()
-    if not args_str or args_str.lower() in ["help", "guidance"]:
-        await send_stock_guidance(update)
+    if args_str.lower() in ["help", "?"]:
+        await send_editproduct_guidance(update)
         return
 
-    lines = [l.strip() for l in args_str.splitlines() if l.strip()]
-    first_line_parts = lines[0].split(None, 1)
-    prod_id = first_line_parts[0].strip()
+    # args_str format: "<product_id> <action> [value/accounts...]"
+    # action: "stock" | "account"
+    arg_lines = [l.strip() for l in args_str.splitlines() if l.strip()]
+    first_parts = arg_lines[0].split(None, 2)  # [prod_id, action, rest?]
+
+    if len(first_parts) < 2:
+        await send_editproduct_guidance(update)
+        return
+
+    prod_id = first_parts[0]
+    action = first_parts[1].lower()
 
     product = catalog.get_product(prod_id)
     if not product:
         await update.message.reply_text(
-            f"❌ <b>Product Not Found!</b> ID <code>{html.escape(prod_id)}</code> naam ka koi product exist nahi karta.",
+            f"❌ <b>Product not found:</b> <code>{html.escape(prod_id)}</code>\n\n"
+            f"Use /editproduct (no args) to see all product IDs.",
             parse_mode="HTML",
         )
         return
 
-    account_lines = []
-    if len(first_line_parts) > 1:
-        account_lines.append(first_line_parts[1].strip())
-    if len(lines) > 1:
-        account_lines.extend(lines[1:])
+    # ---- STOCK action ----
+    if action == "stock":
+        val = first_parts[2].strip() if len(first_parts) > 2 else ""
+        if not val:
+            await send_editproduct_guidance(update)
+            return
 
-    # Check if it's a numeric quantity update like /setstock netflix_1m 50 or /setstock netflix_1m +10
-    if len(account_lines) == 1 and (account_lines[0].replace("+", "").replace("-", "").isdigit()):
-        val = account_lines[0]
+        if val.lower() in ["unlimited", "none", "null"]:
+            db.set_stock(prod_id, None)
+            await update.message.reply_text(
+                f"✅ <b>Stock set to Unlimited</b>\n"
+                f"🆔 <code>{html.escape(prod_id)}</code>",
+                parse_mode="HTML",
+            )
+            return
+
         if val.startswith("+") or val.startswith("-"):
             try:
                 delta = int(val)
                 ok, new_st = db.adjust_stock(prod_id, delta)
-                st_lbl = "Unlimited" if new_st is None else str(new_st)
+                lbl = "Unlimited" if new_st is None else str(new_st)
                 await update.message.reply_text(
-                    f"✅ <b>Stock Updated!</b>\n"
-                    f"🆔 <b>Product:</b> <code>{html.escape(prod_id)}</code>\n"
-                    f"📊 <b>New Stock:</b> {st_lbl}",
+                    f"✅ <b>Stock adjusted</b>  ({val:+d})\n"
+                    f"🆔 <code>{html.escape(prod_id)}</code>  📦 New stock: <b>{lbl}</b>",
                     parse_mode="HTML",
                 )
-                return
             except ValueError:
-                pass
-        else:
-            try:
-                new_st = int(val)
-                db.set_stock(prod_id, new_st)
                 await update.message.reply_text(
-                    f"✅ <b>Stock Set!</b>\n"
-                    f"🆔 <b>Product:</b> <code>{html.escape(prod_id)}</code>\n"
-                    f"📊 <b>New Stock:</b> {new_st}",
+                    "❌ Invalid delta. Use e.g. <code>+10</code> or <code>-5</code>.",
                     parse_mode="HTML",
                 )
-                return
-            except ValueError:
-                pass
-    elif len(account_lines) == 1 and account_lines[0].lower() in ["unlimited", "none", "null"]:
-        db.set_stock(prod_id, None)
-        await update.message.reply_text(
-            f"✅ <b>Stock Set to Unlimited!</b>\n"
-            f"🆔 <b>Product:</b> <code>{html.escape(prod_id)}</code>",
-            parse_mode="HTML",
-        )
-        return
-
-    if not account_lines:
-        await send_stock_guidance(update)
-        return
-
-    # Add accounts to stock
-    added_count = db.add_accounts_to_stock(prod_id, account_lines)
-    total_stock = db.get_stock(prod_id)
-
-    await update.message.reply_text(
-        f"✅ <b>Successfully Added {added_count} Account(s) to Stock!</b>\n\n"
-        f"🆔 <b>Product ID:</b> <code>{html.escape(prod_id)}</code>\n"
-        f"📊 <b>Total Stock Available:</b> {total_stock}\n\n"
-        f"<i>Kharidne par customer ko ek-ek karke account details milti rahengi!</i>",
-        parse_mode="HTML",
-    )
-        if not success:
-            await update.message.reply_text("❌ Stock update fail ho gaya.", parse_mode="HTML")
             return
 
-        s_text = "Unlimited" if new_stock is None else str(new_stock)
+        try:
+            new_st = int(val)
+            if new_st < 0:
+                raise ValueError
+            db.set_stock(prod_id, new_st)
+            await update.message.reply_text(
+                f"✅ <b>Stock updated</b>\n"
+                f"🆔 <code>{html.escape(prod_id)}</code>  📦 New stock: <b>{new_st}</b>",
+                parse_mode="HTML",
+            )
+        except ValueError:
+            await update.message.reply_text(
+                "❌ Invalid stock value. Use a number, <code>+/-delta</code>, or <code>unlimited</code>.",
+                parse_mode="HTML",
+            )
+        return
+
+    # ---- ACCOUNT action ----
+    if action == "account":
+        # accounts can be on the same line or on subsequent lines
+        account_lines = []
+        if len(first_parts) > 2 and first_parts[2].strip():
+            account_lines.append(first_parts[2].strip())
+        account_lines.extend(arg_lines[1:])  # lines after the first
+
+        if not account_lines:
+            await update.message.reply_text(
+                "❌ No account data provided.\n\n"
+                "Format: <code>/editproduct &lt;id&gt; account email:password</code>",
+                parse_mode="HTML",
+            )
+            return
+
+        added = db.add_accounts_to_stock(prod_id, account_lines)
+        total = db.get_stock(prod_id)
         await update.message.reply_text(
-            f"✅ <b>Stock Updated Successfully!</b>\n\n"
-            f"📦 <b>Product:</b> {html.escape(product['name'])}\n"
-            f"🆔 <b>ID:</b> <code>{html.escape(prod_id)}</code>\n"
-            f"📊 <b>New Stock:</b> <b>{s_text}</b>",
+            f"✅ <b>{added} account(s) added</b>\n"
+            f"🆔 <code>{html.escape(prod_id)}</code>  📦 Total stock: <b>{total}</b>",
             parse_mode="HTML",
         )
         return
 
-    # Unlimited / None
-    if val.lower() in ["unlimited", "none", "null", "infinite", "-1"]:
-        db.set_stock(prod_id, None)
-        await update.message.reply_text(
-            f"✅ <b>Stock Updated Successfully!</b>\n\n"
-            f"📦 <b>Product:</b> {html.escape(product['name'])}\n"
-            f"🆔 <b>ID:</b> <code>{html.escape(prod_id)}</code>\n"
-            f"📊 <b>New Stock:</b> <b>Unlimited</b>",
-            parse_mode="HTML",
-        )
-        return
-
-    # Specific integer number
-    try:
-        new_stock = int(val)
-        if new_stock < 0:
-            raise ValueError
-    except ValueError:
-        await update.message.reply_text(
-            "❌ <b>Invalid Stock Value!</b> Number (e.g. <code>50</code>), relative value (e.g. <code>+10</code>), ya <code>unlimited</code> specify karein.",
-            parse_mode="HTML",
-        )
-        return
-
-    db.set_stock(prod_id, new_stock)
+    # Unknown action
     await update.message.reply_text(
-        f"✅ <b>Stock Updated Successfully!</b>\n\n"
-        f"📦 <b>Product:</b> {html.escape(product['name'])}\n"
-        f"🆔 <b>ID:</b> <code>{html.escape(prod_id)}</code>\n"
-        f"📊 <b>New Stock:</b> <b>{new_stock}</b>",
+        f"❌ Unknown action: <code>{html.escape(action)}</code>\n"
+        "Valid actions: <code>stock</code>, <code>account</code>",
         parse_mode="HTML",
     )
+
+
+# ---------------------------------------------------------------------------
+# Admin /removeproduct
+# ---------------------------------------------------------------------------
+async def removeproduct_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if not user or not is_admin(user.id):
+        return  # silently ignore non-admins
+
+    full_text = (update.message.text or "").strip()
+    parts = full_text.split(None, 1)
+    if len(parts) < 2:
+        # No ID given — show current products
+        prods = catalog.all_products()
+        if not prods:
+            await update.message.reply_text(
+                "ℹ️ No products in catalog.", parse_mode="HTML"
+            )
+            return
+        lines = [
+            f"• <code>{html.escape(p['id'])}</code> — {html.escape(p['name'])}"
+            for p in prods
+        ]
+        await update.message.reply_text(
+            "🗑 <b>Remove a product</b>\n\n"
+            "Current products:\n" + "\n".join(lines) + "\n\n"
+            "Usage: <code>/removeproduct &lt;id&gt;</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    prod_id = parts[1].strip()
+    product = catalog.get_product(prod_id)
+    if not product:
+        await update.message.reply_text(
+            f"❌ <b>Product not found:</b> <code>{html.escape(prod_id)}</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    deleted = db.delete_product(prod_id)
+    if deleted:
+        await update.message.reply_text(
+            f"✅ <b>Product removed</b>\n\n"
+            f"🆔 <code>{html.escape(prod_id)}</code>\n"
+            f"📦 {html.escape(product['name'])}\n\n"
+            f"<i>The product will no longer appear in the shop.</i>",
+            parse_mode="HTML",
+        )
+    else:
+        await update.message.reply_text(
+            f"❌ Could not delete <code>{html.escape(prod_id)}</code>. "
+            "It may have already been removed.",
+            parse_mode="HTML",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1068,13 +1139,10 @@ def main() -> None:
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("privacy", privacy_command))
     application.add_handler(CommandHandler("addproduct", add_product_command))
-    application.add_handler(CommandHandler("add_product", add_product_command))
-    application.add_handler(CommandHandler("stock", stock_command))
-    application.add_handler(CommandHandler("setstock", stock_command))
-    application.add_handler(CommandHandler("addstock", stock_command))
-    application.add_handler(CommandHandler("addaccounts", stock_command))
-    application.add_handler(CommandHandler("add_accounts", stock_command))
+    application.add_handler(CommandHandler("editproduct", editproduct_command))
+    application.add_handler(CommandHandler("removeproduct", removeproduct_command))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_deposit_amount)

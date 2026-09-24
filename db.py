@@ -604,6 +604,18 @@ def add_product(
         )
 
 
+def delete_product(product_id: str) -> bool:
+    """
+    Remove a product from the catalog (products + product_stock tables).
+    Returns True if a row was actually deleted, False if not found.
+    """
+    with _lock, _connect() as conn:
+        cur = _exec(conn, "DELETE FROM products WHERE id = ?", (product_id,))
+        deleted = cur.rowcount > 0
+        _exec(conn, "DELETE FROM product_stock WHERE product_id = ?", (product_id,))
+        return deleted
+
+
 def seed_stock(products: list) -> None:
     with _lock, _connect() as conn:
         for p in products:
