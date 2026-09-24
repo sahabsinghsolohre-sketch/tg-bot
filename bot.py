@@ -134,6 +134,10 @@ def main_menu_keyboard(lang: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(t("btn_support", lang), callback_data="support"),
             InlineKeyboardButton(t("btn_refer", lang), callback_data="refer"),
         ],
+        [
+            InlineKeyboardButton("📜 ✦ My Order History ✦", callback_data="orders_menu"),
+            InlineKeyboardButton("💻 Source Code", callback_data="sourcecode"),
+        ],
         [InlineKeyboardButton(t("btn_language", lang), callback_data="language")],
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -167,7 +171,7 @@ def language_keyboard(lang: str) -> InlineKeyboardMarkup:
 
 
 def shop_keyboard(lang: str) -> InlineKeyboardMarkup:
-    """List every product as a button, plus My Orders and Back."""
+    """List every product as a button, plus Refresh, My Orders and Back."""
     rows = []
     for p in catalog.all_products():
         stock = db.get_stock(p["id"])
@@ -176,7 +180,10 @@ def shop_keyboard(lang: str) -> InlineKeyboardMarkup:
         if sold_out:
             label = f"❌ {label}"
         rows.append([InlineKeyboardButton(label, callback_data=f"prod_{p['id']}")])
-    rows.append([InlineKeyboardButton(t("btn_orders", lang), callback_data="orders")])
+    rows.append([
+        InlineKeyboardButton("🔄 Refresh", callback_data="products"),
+        InlineKeyboardButton(t("btn_orders", lang), callback_data="orders"),
+    ])
     rows.append([InlineKeyboardButton(t("btn_back", lang), callback_data="menu")])
     return InlineKeyboardMarkup(rows)
 
@@ -813,6 +820,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     elif data == "orders":
         await show_orders(query, user_id, lang)
+
+    elif data == "orders_menu":
+        await show_orders(query, user_id, lang)
+
+    elif data == "sourcecode":
+        await safe_edit(
+            query,
+            "💻 <b>Bot Source Code</b>\n\n"
+            "Want the complete source code of this bot?\n\n"
+            "<blockquote>"
+            "💵  Price    —  <b>$39</b>\n"
+            "📦  Includes —  <b>Full source code + setup guide</b>\n"
+            "⚡  Delivery  —  <b>Instant after payment</b>"
+            "</blockquote>\n\n"
+            "Contact <b>@NarayaniAdmin</b> to purchase. 👆",
+            reply_markup=back_menu_keyboard(lang),
+        )
 
     elif data.startswith("prod_"):
         await show_product(query, data[len("prod_"):], user_id, lang)
