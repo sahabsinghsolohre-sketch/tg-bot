@@ -128,17 +128,16 @@ def main_menu_keyboard(lang: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(t("btn_shop", lang), callback_data="products")],
         [
             InlineKeyboardButton(t("btn_deposit", lang), callback_data="deposit"),
-            InlineKeyboardButton(t("btn_profile", lang), callback_data="profile"),
-        ],
-        [
-            InlineKeyboardButton(t("btn_support", lang), callback_data="support"),
-            InlineKeyboardButton(t("btn_refer", lang), callback_data="refer"),
-        ],
-        [
             InlineKeyboardButton(t("btn_orders", lang), callback_data="orders_menu"),
-            InlineKeyboardButton("💻 Source Code", callback_data="sourcecode"),
         ],
-        [InlineKeyboardButton(t("btn_language", lang), callback_data="language")],
+        [
+            InlineKeyboardButton(t("btn_profile", lang), callback_data="profile"),
+            InlineKeyboardButton(t("btn_support", lang), callback_data="support"),
+        ],
+        [
+            InlineKeyboardButton(t("btn_refer", lang), callback_data="refer"),
+            InlineKeyboardButton(t("btn_language", lang), callback_data="language"),
+        ],
     ]
     return InlineKeyboardMarkup(keyboard)
 

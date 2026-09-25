@@ -162,7 +162,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Buy now",
         "btn_confirm": "✅ Confirm purchase",
-        "btn_orders": "📜 My Orders",
+        "btn_orders": "📦 My Orders",
         "btn_back_shop": "⬅️ Back to shop",
         "btn_deposit_now": "💵 Deposit now",
         "shop_list": (
@@ -216,7 +216,7 @@ TRANSLATIONS = {
             "You haven't placed any orders yet.\n"
             "Head to the <b>Shop</b> to grab something! 🛍"
         ),
-        "orders_header": "📜 <b>My Order History</b>\n\nYour recent orders:\n",
+        "orders_header": "📦 <b>My Orders</b>\n\nYour recent orders:\n",
         "orders_line": "🧾 #{order_id} — {name} — <b>${price:.2f}</b>",
         "stock_unlimited": "Unlimited",
     },
@@ -352,7 +352,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 अभी खरीदें",
         "btn_confirm": "✅ खरीद पक्की करें",
-        "btn_orders": "📜 मेरे ऑर्डर",
+        "btn_orders": "📦 My Orders",
         "btn_back_shop": "⬅️ शॉप पर वापस",
         "btn_deposit_now": "💵 अभी डिपॉज़िट करें",
         "shop_list": (
@@ -402,7 +402,7 @@ TRANSLATIONS = {
             "आपने अभी तक कोई ऑर्डर नहीं किया।\n"
             "कुछ लेने के लिए <b>शॉप</b> पर जाएं! 🛍"
         ),
-        "orders_header": "📜 <b>मेरा ऑर्डर इतिहास</b>\n\nआपके हाल के ऑर्डर:\n",
+        "orders_header": "📦 <b>मेरे ऑर्डर्स (My Orders)</b>\n\nआपके हालिया ऑर्डर्स:\n",
         "orders_line": "🧾 #{order_id} — {name} — <b>${price:.2f}</b>",
         "stock_unlimited": "असीमित",
     },
@@ -537,7 +537,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Comprar ya",
         "btn_confirm": "✅ Confirmar compra",
-        "btn_orders": "📜 Mis pedidos",
+        "btn_orders": "📦 Mis Pedidos",
         "btn_back_shop": "⬅️ Volver a la tienda",
         "btn_deposit_now": "💵 Depositar ahora",
         "shop_list": (
@@ -587,7 +587,7 @@ TRANSLATIONS = {
             "Aún no has hecho ningún pedido.\n"
             "¡Ve a la <b>Tienda</b> para conseguir algo! 🛍"
         ),
-        "orders_header": "📜 <b>Historial de pedidos</b>\n\nTus pedidos recientes:\n",
+        "orders_header": "📦 <b>Mis Pedidos</b>\n\nTus pedidos recientes:\n",
         "orders_line": "🧾 #{order_id} — {name} — <b>${price:.2f}</b>",
         "stock_unlimited": "Ilimitado",
     },
@@ -722,7 +722,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Купить",
         "btn_confirm": "✅ Подтвердить покупку",
-        "btn_orders": "📜 Мои заказы",
+        "btn_orders": "📦 Мои заказы",
         "btn_back_shop": "⬅️ В магазин",
         "btn_deposit_now": "💵 Пополнить",
         "shop_list": (
@@ -772,7 +772,7 @@ TRANSLATIONS = {
             "У вас пока нет заказов.\n"
             "Загляните в <b>Магазин</b>, чтобы что-нибудь выбрать! 🛍"
         ),
-        "orders_header": "📜 <b>История заказов</b>\n\nВаши недавние заказы:\n",
+        "orders_header": "📦 <b>Мои заказы</b>\n\nВаши недавние заказы:\n",
         "orders_line": "🧾 #{order_id} — {name} — <b>${price:.2f}</b>",
         "stock_unlimited": "Без лимита",
     },
