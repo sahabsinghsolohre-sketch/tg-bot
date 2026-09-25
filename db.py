@@ -24,31 +24,140 @@ REFERRAL_MIN_DEPOSIT = 10.0
 
 _lock = threading.Lock()
 
+# A brand-new Postgres/Neon connection costs ~3 seconds; a query on a warm
+# connection costs ~0.1 second. So one connection per thread is cached and reused
+# instead of reconnecting on every single query.
+IDLE_PING_AFTER = 45  # seconds of inactivity after which the cached conn is pinged
+_local = threading.local()
+
+
+def _raw_connect():
+    """Open a brand-new database connection."""
+    if IS_POSTGRES:
+        return psycopg2.connect(
+            DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor
+        )
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _drop_conn() -> None:
+    """Forget (and close) the cached connection of the current thread."""
+    conn = getattr(_local, "conn", None)
+    _local.conn = None
+    _local.used = 0.0
+    if conn is not None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _connection():
+    """Return this thread's reusable connection, reconnecting only when stale."""
+    conn = getattr(_local, "conn", None)
+    if conn is not None:
+        if time.time() - getattr(_local, "used", 0.0) < IDLE_PING_AFTER:
+            return conn
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT 1")  # cheap keep-alive check after an idle period
+            cur.close()
+            return conn
+        except Exception:
+            _drop_conn()
+    conn = _raw_connect()
+    _local.conn = conn
+    _local.used = time.time()
+    return conn
+
 
 @contextmanager
 def _connect():
-    if IS_POSTGRES:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        try:
-            yield conn
+    conn = _connection()
+    try:
+        yield conn
+        # A read-only block needs no COMMIT round trip — that alone halves the
+        # latency of every "open the shop / my orders" press on a remote database.
+        if not IS_POSTGRES or getattr(_local, "dirty", False):
             conn.commit()
-        except Exception:
+        _local.dirty = False
+    except Exception:
+        try:
             conn.rollback()
-            raise
-        finally:
-            conn.close()
-    else:
-        conn = sqlite3.connect(DB_PATH, timeout=30)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-            conn.commit()
-        finally:
-            conn.close()
+        except Exception:
+            _drop_conn()
+        _local.dirty = False
+        raise
+    finally:
+        _local.used = time.time()
+
+
+def _is_write(sql: str) -> bool:
+    """True when a statement changes data (so a COMMIT round trip is needed)."""
+    head = sql.lstrip().split(None, 1)
+    return bool(head) and head[0].lower() in (
+        "insert",
+        "update",
+        "delete",
+        "alter",
+        "create",
+        "drop",
+        "truncate",
+        "replace",
+        "with",
+    )
+
+
+def _mark_dirty() -> None:
+    """Force the next ``_connect()`` exit to commit (used by raw-cursor writes)."""
+    _local.dirty = True
+
+
+# --- tiny in-process caches --------------------------------------------------
+# A round trip to the hosted Postgres takes ~0.5-1s, so short-lived snapshots keep
+# button presses snappy while still showing freshly decayed / updated values.
+STOCK_CACHE_TTL = 15   # seconds a stock snapshot may be reused
+LANG_CACHE_TTL = 300   # seconds a cached user language may be reused
+PRODUCT_CACHE_TTL = 30  # seconds a cached catalog listing may be reused
+
+_cache: dict = {}
+_cache_lock = threading.Lock()
+
+
+def _cache_get(key, ttl: float):
+    with _cache_lock:
+        hit = _cache.get(key)
+    if hit is None:
+        return None
+    stored_at, value = hit
+    if time.time() - stored_at > ttl:
+        return None
+    return value
+
+
+def _cache_set(key, value) -> None:
+    with _cache_lock:
+        _cache[key] = (time.time(), value)
+
+
+def _cache_invalidate(*keys) -> None:
+    with _cache_lock:
+        for key in keys:
+            _cache.pop(key, None)
+
+
+def clear_caches() -> None:
+    """Drop every cached snapshot (called after stock or catalog changes)."""
+    with _cache_lock:
+        _cache.clear()
 
 
 def _exec(conn, sql: str, params: tuple = ()):
     """Execute SQL query with driver-appropriate parameter placeholder replacement."""
+    if _is_write(sql):
+        _mark_dirty()
     if IS_POSTGRES:
         pg_sql = sql.replace("?", "%s")
         if "ROUND(unique_amount, 4)" in pg_sql:
@@ -79,6 +188,7 @@ def init_db() -> None:
     """Create tables if they don't exist, and add any missing columns (migrations)."""
     with _lock, _connect() as conn:
         if IS_POSTGRES:
+            _mark_dirty()  # raw-cursor DDL below must be committed
             cur = conn.cursor()
             cur.execute(
                 """
@@ -237,6 +347,9 @@ def ensure_user(user_id: int) -> None:
 
 
 def get_language(user_id: int) -> str:
+    cached = _cache_get(("lang", user_id), LANG_CACHE_TTL)
+    if cached is not None:
+        return cached
     with _connect() as conn:
         cur = _exec(
             conn,
@@ -244,7 +357,38 @@ def get_language(user_id: int) -> str:
             (user_id,),
         )
         row = cur.fetchone()
-        return row["language"] if row else "en"
+    lang = row["language"] if row else "en"
+    _cache_set(("lang", user_id), lang)
+    return lang
+
+
+def touch_user(user_id: int) -> str:
+    """Create the user row if missing and return their language in ONE query.
+
+    Replaces the ``ensure_user()`` + ``get_language()`` pair that every button
+    press used to run (two remote round trips instead of one).
+    """
+    with _lock, _connect() as conn:
+        if IS_POSTGRES:
+            cur = _exec(
+                conn,
+                "INSERT INTO users (user_id) VALUES (?) "
+                "ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id "
+                "RETURNING language",
+                (user_id,),
+            )
+        else:
+            cur = _exec(
+                conn,
+                "INSERT INTO users (user_id) VALUES (?) "
+                "ON CONFLICT (user_id) DO UPDATE SET language = users.language "
+                "RETURNING language",
+                (user_id,),
+            )
+        row = cur.fetchone()
+    lang = row["language"] if row else "en"
+    _cache_set(("lang", user_id), lang)
+    return lang
 
 
 def set_language(user_id: int, language: str) -> None:
@@ -257,6 +401,7 @@ def set_language(user_id: int, language: str) -> None:
             """,
             (user_id, language),
         )
+    _cache_set(("lang", user_id), language)
 
 
 def get_balance(user_id: int) -> float:
@@ -532,6 +677,7 @@ def add_accounts_to_stock(product_id: str, accounts: list[str]) -> int:
             """,
             (product_id, new_stock),
         )
+    _cache_invalidate("stock_maps")
     return count
 
 
@@ -621,27 +767,34 @@ def seed_products(products: list) -> None:
                     """,
                     (pid, stock),
                 )
+    clear_caches()  # catalog/stock snapshots are stale after a re-seed
 
 
 def get_all_products() -> list:
-    with _connect() as conn:
-        cur = _exec(
-            conn,
-            "SELECT id, name, price, description, stock, delivery FROM products",
-        )
-        rows = cur.fetchall()
-        return [dict(r) for r in rows]
+    """Every product row, cached for :data:`PRODUCT_CACHE_TTL` seconds.
+
+    The catalog only changes through the admin commands (which clear the cache),
+    so a cached copy removes a remote round trip from every shop/detail view.
+    Returned dicts are copies — callers may freely mutate them.
+    """
+    cached = _cache_get("products", PRODUCT_CACHE_TTL)
+    if cached is None:
+        with _connect() as conn:
+            cur = _exec(
+                conn,
+                "SELECT id, name, price, description, stock, delivery FROM products",
+            )
+            rows = cur.fetchall()
+        cached = [dict(r) for r in rows]
+        _cache_set("products", cached)
+    return [dict(p) for p in cached]
 
 
 def get_product(product_id: str) -> dict | None:
-    with _connect() as conn:
-        cur = _exec(
-            conn,
-            "SELECT id, name, price, description, stock, delivery FROM products WHERE id = ?",
-            (product_id,),
-        )
-        row = cur.fetchone()
-        return dict(row) if row else None
+    for p in get_all_products():
+        if p["id"] == product_id:
+            return p
+    return None
 
 
 def add_product(
@@ -669,6 +822,7 @@ def add_product(
             "INSERT INTO product_stock (product_id, stock) VALUES (?, ?) ON CONFLICT (product_id) DO UPDATE SET stock = EXCLUDED.stock" if IS_POSTGRES else "INSERT INTO product_stock (product_id, stock) VALUES (?, ?) ON CONFLICT (product_id) DO UPDATE SET stock = excluded.stock",
             (product_id, stock),
         )
+    clear_caches()
 
 
 def delete_product(product_id: str) -> bool:
@@ -680,7 +834,8 @@ def delete_product(product_id: str) -> bool:
         cur = _exec(conn, "DELETE FROM products WHERE id = ?", (product_id,))
         deleted = cur.rowcount > 0
         _exec(conn, "DELETE FROM product_stock WHERE product_id = ?", (product_id,))
-        return deleted
+    clear_caches()
+    return deleted
 
 
 def seed_stock(products: list) -> None:
@@ -694,42 +849,123 @@ def seed_stock(products: list) -> None:
 
 
 def get_stock(product_id: str):
+    """Current stock of one product (``None`` = unlimited).
+
+    Reads the cached stock snapshot, so opening a product page costs no extra
+    database round trip at all.
+    """
+    return get_stocks([product_id]).get(product_id)
+
+
+_STOCK_SNAPSHOT_SQL = """
+SELECT 'acc' AS src, product_id AS pid, COUNT(*) AS c,
+       SUM(CASE WHEN is_sold = 0 THEN 1 ELSE 0 END) AS u
+  FROM product_accounts GROUP BY product_id
+UNION ALL
+SELECT 'stock', product_id, stock, NULL FROM product_stock
+UNION ALL
+SELECT 'prod', id, stock, NULL FROM products
+"""
+
+
+def _stock_maps(refresh: bool = False):
+    """Return (accounts, unsold, stocks, products) maps using ONE query, cached briefly."""
+    if not refresh:
+        cached = _cache_get("stock_maps", STOCK_CACHE_TTL)
+        if cached is not None:
+            return cached
+
     with _connect() as conn:
-        # 1. If product has account inventory in product_accounts, use unsold count
-        cur = _exec(
-            conn,
-            "SELECT COUNT(*) AS c FROM product_accounts WHERE product_id = ? AND is_sold = 0",
-            (product_id,),
-        )
-        row = cur.fetchone()
-        acc_count = int(row["c"]) if row else 0
+        rows = _exec(conn, _STOCK_SNAPSHOT_SQL).fetchall()
 
-        tot_cur = _exec(
-            conn,
-            "SELECT 1 FROM product_accounts WHERE product_id = ? LIMIT 1",
-            (product_id,),
-        )
-        if tot_cur.fetchone() is not None:
-            return acc_count
+    accounts, unsold, stocks, products = {}, {}, {}, {}
+    for row in rows:
+        src = row["src"]
+        pid = row["pid"]
+        if src == "acc":
+            accounts[pid] = int(row["c"] or 0)
+            unsold[pid] = int(row["u"] or 0)
+        elif row["c"] is not None:
+            (stocks if src == "stock" else products)[pid] = row["c"]
 
-        # 2. Otherwise check product_stock table
-        st_cur = _exec(
-            conn,
-            "SELECT stock FROM product_stock WHERE product_id = ?",
-            (product_id,),
-        )
-        st_row = st_cur.fetchone()
-        if st_row and st_row["stock"] is not None:
-            return st_row["stock"]
+    maps = (accounts, unsold, stocks, products)
+    _cache_set("stock_maps", maps)
+    return maps
 
-        # 3. Fallback to products table
-        pcur = _exec(
-            conn,
-            "SELECT stock FROM products WHERE id = ?",
-            (product_id,),
-        )
-        prow = pcur.fetchone()
-        return prow["stock"] if prow else None
+
+def inventory_products() -> set:
+    """Ids of products whose stock is a real account-inventory count.
+
+    Those numbers must never be faked by the background stock jobs.
+    """
+    accounts, _unsold, _stocks, _products = _stock_maps()
+    return set(accounts)
+
+
+def get_stocks(product_ids: list[str] | None = None) -> dict:
+    """Return ``{product_id: stock}`` for many products in a single query.
+
+    Uses the same priority as :func:`get_stock`: unsold account inventory first,
+    then the ``product_stock`` table, then the ``products`` table. ``None`` means
+    unlimited. The snapshot is cached for :data:`STOCK_CACHE_TTL` seconds so a
+    button press does not wait for a fresh remote round trip every time.
+    """
+    accounts, unsold, stocks, products = _stock_maps()
+
+    ids = (
+        list(product_ids)
+        if product_ids is not None
+        else sorted(set(stocks) | set(products))
+    )
+    result = {}
+    for pid in ids:
+        if accounts.get(pid, 0) > 0:
+            result[pid] = unsold.get(pid, 0)
+        elif stocks.get(pid) is not None:
+            result[pid] = stocks[pid]
+        else:
+            result[pid] = products.get(pid)
+    return result
+
+
+def set_stocks(values: dict) -> int:
+    """Update the stock of many products in as few round trips as possible.
+
+    Used by the background stock jobs so they never flood the database with one
+    connection (or one query) per product.
+    """
+    if not values:
+        return 0
+    items = [(pid, stock) for pid, stock in values.items()]
+    with _lock, _connect() as conn:
+        _mark_dirty()
+        if IS_POSTGRES:
+            with conn.cursor() as cur:
+                psycopg2.extras.execute_values(
+                    cur,
+                    "INSERT INTO product_stock (product_id, stock) VALUES %s "
+                    "ON CONFLICT (product_id) DO UPDATE SET stock = EXCLUDED.stock",
+                    items,
+                )
+            with conn.cursor() as cur:
+                psycopg2.extras.execute_values(
+                    cur,
+                    "UPDATE products AS p SET stock = v.stock "
+                    "FROM (VALUES %s) AS v(id, stock) WHERE p.id = v.id",
+                    items,
+                )
+        else:
+            conn.executemany(
+                "INSERT INTO product_stock (product_id, stock) VALUES (?, ?) "
+                "ON CONFLICT(product_id) DO UPDATE SET stock = EXCLUDED.stock",
+                items,
+            )
+            conn.executemany(
+                "UPDATE products SET stock = ? WHERE id = ?",
+                [(stock, pid) for pid, stock in items],
+            )
+    _cache_invalidate("stock_maps")
+    return len(items)
 
 
 def set_stock(product_id: str, new_stock: int | None) -> bool:
@@ -754,6 +990,7 @@ def set_stock(product_id: str, new_stock: int | None) -> bool:
             """,
             (product_id, new_stock),
         )
+        _cache_invalidate("stock_maps")
         return True
 
 
@@ -790,44 +1027,69 @@ def adjust_stock(product_id: str, delta: int) -> tuple[bool, int | None]:
             """,
             (product_id, new_stock),
         )
+        _cache_invalidate("stock_maps")
         return True, new_stock
 
 
 # --- Purchases / orders -----------------------------------------------------
+_PURCHASE_INFO_SQL = """
+SELECT
+    (SELECT a.id FROM product_accounts a
+      WHERE a.product_id = ? AND a.is_sold = 0 ORDER BY a.id ASC LIMIT 1) AS acc_id,
+    (SELECT a.account_data FROM product_accounts a
+      WHERE a.product_id = ? AND a.is_sold = 0 ORDER BY a.id ASC LIMIT 1) AS acc_data,
+    (SELECT COUNT(*) FROM product_accounts a
+      WHERE a.product_id = ?)                                             AS acc_total,
+    (SELECT COUNT(*) FROM product_accounts a
+      WHERE a.product_id = ? AND a.is_sold = 0)                           AS acc_unsold,
+    (SELECT s.stock FROM product_stock s WHERE s.product_id = ?)          AS stock_row,
+    (SELECT p.stock FROM products p WHERE p.id = ?)                       AS stock_prod,
+    (SELECT u.balance FROM users u WHERE u.user_id = ?)                   AS balance
+"""
+
+
 def purchase(user_id: int, product: dict) -> dict:
+    """Sell one unit of ``product`` to ``user_id`` (stock, balance and order row).
+
+    The whole flow is kept to a handful of statements so a purchase on a remote
+    database stays fast — every extra statement costs a full round trip.
+    """
     price = float(product["price"])
     pid = product["id"]
     now = int(time.time())
 
     with _lock, _connect() as conn:
-        _exec(conn, "INSERT INTO users (user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", (user_id,))
-
-        # Check for available account in product_accounts
-        acc_cur = _exec(
+        _exec(
             conn,
-            "SELECT id, account_data FROM product_accounts WHERE product_id = ? AND is_sold = 0 ORDER BY id ASC LIMIT 1",
-            (pid,),
+            "INSERT INTO users (user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING",
+            (user_id,),
         )
-        acc_row = acc_cur.fetchone()
 
-        if acc_row:
-            acc_id = acc_row["id"]
-            delivery_text = acc_row["account_data"]
+        # One query for pending account + stock + balance.
+        info = _exec(
+            conn,
+            _PURCHASE_INFO_SQL,
+            (pid, pid, pid, pid, pid, pid, user_id),
+        ).fetchone()
+
+        acc_id = info["acc_id"] if info else None
+        acc_total = int(info["acc_total"] or 0) if info else 0
+        acc_unsold = int(info["acc_unsold"] or 0) if info else 0
+        stock_row = info["stock_row"] if info else None
+        stock_prod = info["stock_prod"] if info else None
+        balance = float(info["balance"] or 0) if info else 0.0
+
+        # Same priority as get_stock(): account inventory wins over plain stock.
+        if acc_total > 0:
+            stock = acc_unsold
+        elif stock_row is not None:
+            stock = stock_row
         else:
-            acc_id = None
-            delivery_text = product.get("delivery") or "Digital Item"
+            stock = stock_prod
 
-        # Check stock
-        stock = get_stock(pid)
         if stock is not None and stock <= 0:
             return {"ok": False, "reason": "out_of_stock"}
 
-        brow = _exec(
-            conn,
-            "SELECT balance FROM users WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
-        balance = float(brow["balance"]) if brow else 0.0
         if balance < price:
             return {
                 "ok": False,
@@ -836,7 +1098,11 @@ def purchase(user_id: int, product: dict) -> dict:
                 "price": price,
             }
 
-        # Deduct balance + count order
+        delivery_text = (
+            info["acc_data"] if acc_id is not None else (product.get("delivery") or "Digital Item")
+        )
+
+        # Deduct balance + count the order in one statement.
         _exec(
             conn,
             "UPDATE users SET balance = balance - ?, orders = orders + 1 WHERE user_id = ?",
@@ -849,16 +1115,26 @@ def purchase(user_id: int, product: dict) -> dict:
                 "UPDATE product_accounts SET is_sold = 1 WHERE id = ?",
                 (acc_id,),
             )
-            cnt_cur = _exec(
+            # One row was sold, so the synced stock count is simply unsold - 1
+            # (no extra COUNT round trip needed).
+            remaining = max(0, acc_unsold - 1)
+            _exec(
                 conn,
-                "SELECT COUNT(*) AS c FROM product_accounts WHERE product_id = ? AND is_sold = 0",
+                "UPDATE products SET stock = ? WHERE id = ?",
+                (remaining, pid),
+            )
+            _exec(
+                conn,
+                "INSERT INTO product_stock (product_id, stock) VALUES (?, ?) "
+                "ON CONFLICT(product_id) DO UPDATE SET stock = EXCLUDED.stock",
+                (pid, remaining),
+            )
+        elif stock is not None:
+            _exec(
+                conn,
+                "UPDATE product_stock SET stock = stock - 1 WHERE product_id = ?",
                 (pid,),
             )
-            new_st = int(cnt_cur.fetchone()["c"])
-            _exec(conn, "UPDATE products SET stock = ? WHERE id = ?", (new_st, pid))
-            _exec(conn, "UPDATE product_stock SET stock = ? WHERE product_id = ?", (new_st, pid))
-        elif stock is not None:
-            _exec(conn, "UPDATE product_stock SET stock = stock - 1 WHERE product_id = ?", (pid,))
             _exec(conn, "UPDATE products SET stock = stock - 1 WHERE id = ?", (pid,))
 
         if IS_POSTGRES:
@@ -878,13 +1154,13 @@ def purchase(user_id: int, product: dict) -> dict:
             )
             order_id = cur.lastrowid
 
-        new_balance = balance - price
-        return {
-            "ok": True,
-            "order_id": order_id,
-            "new_balance": new_balance,
-            "delivery": delivery_text,
-        }
+    _cache_invalidate("stock_maps")
+    return {
+        "ok": True,
+        "order_id": order_id,
+        "new_balance": balance - price,
+        "delivery": delivery_text,
+    }
 
 
 def get_orders(user_id: int, limit: int = 10) -> list:

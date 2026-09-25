@@ -173,8 +173,10 @@ def language_keyboard(lang: str) -> InlineKeyboardMarkup:
 def shop_keyboard(lang: str) -> InlineKeyboardMarkup:
     """List every product as a button, plus Refresh, My Orders and Back."""
     rows = []
-    for p in catalog.all_products():
-        stock = db.get_stock(p["id"])
+    prods = catalog.all_products()
+    stocks = db.get_stocks([p["id"] for p in prods])  # whole shop in 3 queries
+    for p in prods:
+        stock = stocks.get(p["id"])
         sold_out = stock is not None and stock <= 0
         label = f"{p['name']} — ${p['price']:.2f}"
         if sold_out:
@@ -283,7 +285,6 @@ def _referral_link(bot_username: str, user_id: int) -> str:
 # ---------------------------------------------------------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    db.ensure_user(user.id)
 
     # Capture a referral payload like: /start ref123456789
     if context.args:
@@ -296,7 +297,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             except ValueError:
                 pass
 
-    lang = user_lang(user.id)
+    # Creates the user row if needed AND returns their language in one query.
+    lang = db.touch_user(user.id)
     await update.message.reply_text(
         t("welcome", lang, name=html.escape(user.first_name)),
         parse_mode="HTML",
@@ -763,7 +765,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         pass  # callback query too old / already answered — safe to ignore
     data = query.data
     user_id = query.from_user.id
-    db.ensure_user(user_id)
 
     # Any button press cancels an in-progress amount entry.
     context.user_data["awaiting_deposit_amount"] = False
@@ -781,7 +782,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    lang = user_lang(user_id)
+    # Makes sure the user exists and fetches the language in one query.
+    lang = db.touch_user(user_id)
 
     if data == "menu":
         await safe_edit(
@@ -885,8 +887,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 # ---------------------------------------------------------------------------
 # Shop / purchase / orders
 # ---------------------------------------------------------------------------
-def _stock_label(product_id: str, lang: str) -> str:
-    stock = db.get_stock(product_id)
+_UNSET = object()
+
+
+def _stock_label(product_id: str, lang: str, stock=_UNSET) -> str:
+    if stock is _UNSET:
+        stock = db.get_stock(product_id)
     return t("stock_unlimited", lang) if stock is None else str(stock)
 
 
@@ -932,7 +938,7 @@ async def show_product(query, product_id: str, user_id: int, lang: str) -> None:
             name=html.escape(product["name"]),
             description=product["description"],
             price=product["price"],
-            stock=_stock_label(product_id, lang),
+            stock=_stock_label(product_id, lang, stock),
             balance=balance,
         ),
         parse_mode="HTML",
@@ -1121,36 +1127,62 @@ def random_stock() -> int:
 
 
 async def init_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Give a random stock (under 100) to products that are dry or still at 100."""
+    """Give a random stock (under 100) to products that look dry, sold out or capped at 100.
+
+    Real account-inventory products are skipped so their counts stay truthful.
+    """
     prods = catalog.all_products()
-    refreshed = 0
+    stocks = db.get_stocks([p["id"] for p in prods])
+    inventory = db.inventory_products()
+    updates = {}
     for p in prods:
-        stock = db.get_stock(p["id"])
-        if stock is None or stock <= 0 or stock >= STOCK_MAX + 1:
-            db.set_stock(p["id"], random_stock())
-            refreshed += 1
-    if refreshed:
-        logger.info("Random stock (under %s) applied to %s product(s).", STOCK_MAX + 1, refreshed)
+        pid = p["id"]
+        if pid in inventory:
+            continue
+        stock = stocks.get(pid)
+        if stock is not None and (stock < STOCK_MIN or stock > STOCK_MAX):
+            updates[pid] = random_stock()
+    if updates:
+        db.set_stocks(updates)
+        logger.info(
+            "Random stock (under %s) applied to %s product(s).",
+            STOCK_MAX + 1,
+            len(updates),
+        )
 
 
 async def decay_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Drop stock by 1-3 units every 5 minutes to create urgency (never below STOCK_MIN)."""
     prods = catalog.all_products()
+    stocks = db.get_stocks([p["id"] for p in prods])
+    updates = {}
     for p in prods:
-        stock = db.get_stock(p["id"])
+        stock = stocks.get(p["id"])
         if stock is None or stock <= STOCK_MIN:
             continue
-        drop = random.randint(1, 3)
-        new_stock = max(STOCK_MIN, min(STOCK_MAX, stock - drop))
-        db.set_stock(p["id"], new_stock)
+        updates[p["id"]] = max(
+            STOCK_MIN, min(STOCK_MAX, stock - random.randint(1, 3))
+        )
+    if updates:
+        db.set_stocks(updates)
 
 
 async def reset_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Refresh every product with a new random stock under 100 every 24 hours."""
     prods = catalog.all_products()
-    for p in prods:
-        db.set_stock(p["id"], random_stock())
-    logger.info("Stock refreshed with random values under %s for all products.", STOCK_MAX + 1)
+    stocks = db.get_stocks([p["id"] for p in prods])
+    updates = {
+        p["id"]: random_stock()
+        for p in prods
+        if stocks.get(p["id"]) is not None  # keep unlimited products unlimited
+    }
+    if updates:
+        db.set_stocks(updates)
+        logger.info(
+            "Stock refreshed with random values under %s for %s product(s).",
+            STOCK_MAX + 1,
+            len(updates),
+        )
 
 
 # ---------------------------------------------------------------------------

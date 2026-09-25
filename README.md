@@ -55,6 +55,8 @@ Example:
 - Har product ka stock random rehta hai aur hamesha **100 se kam** (12–99). Stock har 5 minute
   me 1–3 kam hota hai (urgency ke liye) aur har 24 ghante me naya random value mil jata hai.
 - `/setstock` se manual stock set karne par bot restart bhi karo to stock overwrite nahi hota —
-  seeding sirf naye products ke liye stock set karta hai.
+  seeding sirf **naye** products ke liye stock set karta hai.
+- Jis product ki stock real account list (`/addstock`) se aati hai, uska number fake jobs change
+  nahi karte.
 - Bot band karne ke liye terminal me `Ctrl+C` dabao.
 - Har naye terminal session me `BOT_TOKEN` dobara set karna hoga (ya use `.env` + `python-dotenv`).
