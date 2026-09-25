@@ -710,12 +710,8 @@ def _clean_seed_stock(value, fallback: int = 1):
 
 def seed_products(products: list) -> None:
     """
-    UPSERT of the catalog — inserts new products and refreshes the editable
-    fields (name, price, description, delivery) of existing ones.
-
-    Stock is deliberately NOT overwritten for products that already exist, so
-    admin changes, real sales and the auto stock decay are never wiped by a bot
-    restart. Only brand-new rows get a stock value (always below 100).
+    UPSERT of the catalog — inserts new products and updates existing ones
+    including setting stock to Unlimited (NULL).
     """
     with _lock, _connect() as conn:
         for p in products:
@@ -723,7 +719,7 @@ def seed_products(products: list) -> None:
             name = p["name"]
             price = float(p["price"])
             desc = p["description"]
-            stock = _clean_seed_stock(p.get("stock", 100))
+            stock = p.get("stock")  # None for Unlimited
             delivery = p.get("delivery", "")
 
             if IS_POSTGRES:
@@ -736,6 +732,7 @@ def seed_products(products: list) -> None:
                         name        = EXCLUDED.name,
                         price       = EXCLUDED.price,
                         description = EXCLUDED.description,
+                        stock       = EXCLUDED.stock,
                         delivery    = EXCLUDED.delivery
                     """,
                     (pid, name, price, desc, stock, delivery),
@@ -745,7 +742,7 @@ def seed_products(products: list) -> None:
                     """
                     INSERT INTO product_stock (product_id, stock)
                     VALUES (%s, %s)
-                    ON CONFLICT (product_id) DO NOTHING
+                    ON CONFLICT (product_id) DO UPDATE SET stock = EXCLUDED.stock
                     """,
                     (pid, stock),
                 )
@@ -758,6 +755,21 @@ def seed_products(products: list) -> None:
                     ON CONFLICT(id) DO UPDATE SET
                         name        = excluded.name,
                         price       = excluded.price,
+                        description = excluded.description,
+                        stock       = excluded.stock,
+                        delivery    = excluded.delivery
+                    """,
+                    (pid, name, price, desc, stock, delivery),
+                )
+                _exec(
+                    conn,
+                    """
+                    INSERT INTO product_stock (product_id, stock)
+                    VALUES (?, ?)
+                    ON CONFLICT (product_id) DO UPDATE SET stock = excluded.stock
+                    """,
+                    (pid, stock),
+                )
                         description = excluded.description,
                         delivery    = excluded.delivery
                     """,
