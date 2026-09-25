@@ -1,0 +1,12 @@
+.env
+bot.db
+_test_bot.db
+.idea/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.log
+*.tmp
+Dockerfile
+.dockerignore

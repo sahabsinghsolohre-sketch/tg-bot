@@ -363,11 +363,16 @@ def get_language(user_id: int) -> str:
 
 
 def touch_user(user_id: int) -> str:
-    """Create the user row if missing and return their language in ONE query.
+    """Create the user row if missing and return their language.
 
-    Replaces the ``ensure_user()`` + ``get_language()`` pair that every button
-    press used to run (two remote round trips instead of one).
+    The write only happens the first time a user is seen in this process — after
+    that the cached language is used, so an ordinary button press costs zero
+    database round trips just for identifying the user.
     """
+    cached = _cache_get(("lang", user_id), LANG_CACHE_TTL)
+    if cached is not None:
+        return cached
+
     with _lock, _connect() as conn:
         if IS_POSTGRES:
             cur = _exec(
@@ -902,15 +907,16 @@ def inventory_products() -> set:
     return set(accounts)
 
 
-def get_stocks(product_ids: list[str] | None = None) -> dict:
+def get_stocks(product_ids: list[str] | None = None, refresh: bool = False) -> dict:
     """Return ``{product_id: stock}`` for many products in a single query.
 
     Uses the same priority as :func:`get_stock`: unsold account inventory first,
     then the ``product_stock`` table, then the ``products`` table. ``None`` means
     unlimited. The snapshot is cached for :data:`STOCK_CACHE_TTL` seconds so a
-    button press does not wait for a fresh remote round trip every time.
+    button press does not wait for a fresh remote round trip every time; pass
+    ``refresh=True`` to force a re-read (used by the background cache warmer).
     """
-    accounts, unsold, stocks, products = _stock_maps()
+    accounts, unsold, stocks, products = _stock_maps(refresh=refresh)
 
     ids = (
         list(product_ids)

@@ -1,0 +1,32 @@
+# Render Blueprint — 24/7 Telegram bot hosting.
+#
+# Deploy: Render Dashboard → New → Blueprint → pick this repo.
+# Secrets (BOT_TOKEN, DATABASE_URL, ...) render dashboard me daalne honge,
+# isliye neeche `sync: false` likha hai.
+services:
+  - type: web
+    name: tg-shop-bot
+    runtime: python
+    plan: free
+    region: singapore          # apna Neon DB jis region me hai uske paas rakho
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      - key: BOT_TOKEN
+        sync: false
+      - key: SUPPORT_CONTACT
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_ID
+        sync: false
+      - key: BEP20_ADDRESS
+        sync: false
+      - key: BSCSCAN_API_KEY
+        sync: false
+      - key: DEPOSIT_WINDOW_MINUTES
+        value: "30"

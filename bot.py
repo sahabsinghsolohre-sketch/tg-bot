@@ -1113,6 +1113,31 @@ async def poll_deposits(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Background cache warmer
+# ---------------------------------------------------------------------------
+CACHE_WARM_INTERVAL = 12  # seconds between background snapshot refreshes
+
+
+def _warm_caches_sync() -> None:
+    """Refresh the catalog + stock snapshots (runs in a worker thread)."""
+    prods = catalog.all_products()
+    db.get_all_products()
+    db.get_stocks([p["id"] for p in prods], refresh=True)
+
+
+async def warm_caches(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Keep the caches warm off the event loop so button presses never wait.
+
+    Every user-facing view then reads from memory instead of paying a full
+    database round trip (which can be ~1s when the DB is hosted far away).
+    """
+    try:
+        await asyncio.to_thread(_warm_caches_sync)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Cache warm-up failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
 # Fake stock decay / reset jobs
 # ---------------------------------------------------------------------------
 # Stock always stays inside this range so the shop never shows 100 and never
@@ -1126,63 +1151,64 @@ def random_stock() -> int:
     return random.randint(STOCK_MIN, STOCK_MAX)
 
 
-async def init_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Give a random stock (under 100) to products that look dry, sold out or capped at 100.
-
-    Real account-inventory products are skipped so their counts stay truthful.
-    """
+def _refresh_stock_sync(mode: str) -> int:
+    """Stock job body (runs in a worker thread so the event loop stays free)."""
     prods = catalog.all_products()
     stocks = db.get_stocks([p["id"] for p in prods])
     inventory = db.inventory_products()
     updates = {}
     for p in prods:
         pid = p["id"]
-        if pid in inventory:
+        if pid in inventory:  # real account inventory — never fake it
             continue
         stock = stocks.get(pid)
-        if stock is not None and (stock < STOCK_MIN or stock > STOCK_MAX):
+        if stock is None:
+            continue
+        if mode == "init":
+            if stock < STOCK_MIN or stock > STOCK_MAX:
+                updates[pid] = random_stock()
+        elif mode == "decay":
+            if stock > STOCK_MIN:
+                updates[pid] = max(
+                    STOCK_MIN, min(STOCK_MAX, stock - random.randint(1, 3))
+                )
+        elif mode == "reset":
             updates[pid] = random_stock()
     if updates:
         db.set_stocks(updates)
+    return len(updates)
+
+
+async def _run_stock_job(mode: str) -> int:
+    try:
+        return await asyncio.to_thread(_refresh_stock_sync, mode)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Stock job (%s) failed: %s", mode, exc)
+        return 0
+
+
+async def init_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Give a random stock (under 100) to products that look dry, sold out or capped at 100."""
+    changed = await _run_stock_job("init")
+    if changed:
         logger.info(
-            "Random stock (under %s) applied to %s product(s).",
-            STOCK_MAX + 1,
-            len(updates),
+            "Random stock (under %s) applied to %s product(s).", STOCK_MAX + 1, changed
         )
 
 
 async def decay_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Drop stock by 1-3 units every 5 minutes to create urgency (never below STOCK_MIN)."""
-    prods = catalog.all_products()
-    stocks = db.get_stocks([p["id"] for p in prods])
-    updates = {}
-    for p in prods:
-        stock = stocks.get(p["id"])
-        if stock is None or stock <= STOCK_MIN:
-            continue
-        updates[p["id"]] = max(
-            STOCK_MIN, min(STOCK_MAX, stock - random.randint(1, 3))
-        )
-    if updates:
-        db.set_stocks(updates)
+    await _run_stock_job("decay")
 
 
 async def reset_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Refresh every product with a new random stock under 100 every 24 hours."""
-    prods = catalog.all_products()
-    stocks = db.get_stocks([p["id"] for p in prods])
-    updates = {
-        p["id"]: random_stock()
-        for p in prods
-        if stocks.get(p["id"]) is not None  # keep unlimited products unlimited
-    }
-    if updates:
-        db.set_stocks(updates)
-        logger.info(
-            "Stock refreshed with random values under %s for %s product(s).",
-            STOCK_MAX + 1,
-            len(updates),
-        )
+    changed = await _run_stock_job("reset")
+    logger.info(
+        "Stock refreshed with random values under %s for %s product(s).",
+        STOCK_MAX + 1,
+        changed,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1253,6 +1279,8 @@ def main() -> None:
     )
 
     application.job_queue.run_repeating(poll_deposits, interval=POLL_INTERVAL, first=10)
+    # Keep catalog + stock snapshots warm (in a worker thread) so presses are instant.
+    application.job_queue.run_repeating(warm_caches, interval=CACHE_WARM_INTERVAL, first=3)
     # Give dry / 100-stock products a random value under 100 right after start-up.
     application.job_queue.run_once(init_stock, when=15)
     # Fake stock decay: drop 1-3 units every 5 minutes (never below STOCK_MIN).
