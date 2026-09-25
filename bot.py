@@ -135,7 +135,7 @@ def main_menu_keyboard(lang: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(t("btn_refer", lang), callback_data="refer"),
         ],
         [
-            InlineKeyboardButton("📜 ✦ My Order History ✦", callback_data="orders_menu"),
+            InlineKeyboardButton(t("btn_orders", lang), callback_data="orders_menu"),
             InlineKeyboardButton("💻 Source Code", callback_data="sourcecode"),
         ],
         [InlineKeyboardButton(t("btn_language", lang), callback_data="language")],
@@ -1109,24 +1109,48 @@ async def poll_deposits(context: ContextTypes.DEFAULT_TYPE) -> None:
 # ---------------------------------------------------------------------------
 # Fake stock decay / reset jobs
 # ---------------------------------------------------------------------------
+# Stock always stays inside this range so the shop never shows 100 and never
+# runs permanently dry. 99 is the highest value a customer can ever see.
+STOCK_MAX = 99
+STOCK_MIN = 12
+
+
+def random_stock() -> int:
+    """Return a random stock value that is always below 100."""
+    return random.randint(STOCK_MIN, STOCK_MAX)
+
+
+async def init_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Give a random stock (under 100) to products that are dry or still at 100."""
+    prods = catalog.all_products()
+    refreshed = 0
+    for p in prods:
+        stock = db.get_stock(p["id"])
+        if stock is None or stock <= 0 or stock >= STOCK_MAX + 1:
+            db.set_stock(p["id"], random_stock())
+            refreshed += 1
+    if refreshed:
+        logger.info("Random stock (under %s) applied to %s product(s).", STOCK_MAX + 1, refreshed)
+
+
 async def decay_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Drop stock by 3-4 units every 5 minutes to create urgency."""
+    """Drop stock by 1-3 units every 5 minutes to create urgency (never below STOCK_MIN)."""
     prods = catalog.all_products()
     for p in prods:
         stock = db.get_stock(p["id"])
-        if stock is None or stock <= 0:
+        if stock is None or stock <= STOCK_MIN:
             continue
-        drop = random.randint(3, 4)
-        new_stock = max(0, stock - drop)
+        drop = random.randint(1, 3)
+        new_stock = max(STOCK_MIN, min(STOCK_MAX, stock - drop))
         db.set_stock(p["id"], new_stock)
 
 
 async def reset_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Reset all product stock to 100 every 24 hours."""
+    """Refresh every product with a new random stock under 100 every 24 hours."""
     prods = catalog.all_products()
     for p in prods:
-        db.set_stock(p["id"], 100)
-    logger.info("Stock reset to 100 for all products.")
+        db.set_stock(p["id"], random_stock())
+    logger.info("Stock refreshed with random values under %s for all products.", STOCK_MAX + 1)
 
 
 # ---------------------------------------------------------------------------
@@ -1170,6 +1194,7 @@ def main() -> None:
 
     db.init_db()
     db.seed_products(catalog.PRODUCTS)
+    logger.info("Catalog seeded: %d products in DB.", len(db.get_all_products()))
 
     if not _crypto_configured():
         logger.warning(
@@ -1196,9 +1221,11 @@ def main() -> None:
     )
 
     application.job_queue.run_repeating(poll_deposits, interval=POLL_INTERVAL, first=10)
-    # Fake stock decay: drop 3-4 units every 5 minutes to create urgency.
+    # Give dry / 100-stock products a random value under 100 right after start-up.
+    application.job_queue.run_once(init_stock, when=15)
+    # Fake stock decay: drop 1-3 units every 5 minutes (never below STOCK_MIN).
     application.job_queue.run_repeating(decay_stock, interval=300, first=60)
-    # Reset all fake stock to 100 every 24 hours.
+    # Refresh all fake stock with new random values (under 100) every 24 hours.
     application.job_queue.run_repeating(reset_stock, interval=86400, first=86400)
 
     logger.info("Bot is starting... Press Ctrl+C to stop.")

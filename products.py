@@ -27,7 +27,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 39,
         "delivery": (
             "✅ <b>Canva Pro (1 Month) — Order Confirmed!</b>\n\n"
             "Your account credentials will be delivered by support shortly.\n"
@@ -49,7 +49,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 14,
         "delivery": (
             "✅ <b>Canva Pro EDU (3 Years) — Order Confirmed!</b>\n\n"
             "Your invite link will be delivered by support shortly.\n"
@@ -73,7 +73,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 46,
         "delivery": (
             "✅ <b>YouTube Premium (3 Months) — Order Confirmed!</b>\n\n"
             "Your account credentials will be delivered by support shortly.\n"
@@ -98,7 +98,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 81,
         "delivery": (
             "✅ <b>Adobe CC (4 Months) — Order Confirmed!</b>\n\n"
             "Your account credentials will be delivered by support shortly.\n"
@@ -122,7 +122,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 17,
         "delivery": (
             "✅ <b>Amazon Prime (6 Months) — Order Confirmed!</b>\n\n"
             "Your account credentials will be delivered by support shortly.\n"
@@ -146,7 +146,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 93,
         "delivery": (
             "✅ <b>Netflix Premium (Private Account) — Order Confirmed!</b>\n\n"
             "Your private account credentials will be delivered by support shortly.\n"
@@ -170,7 +170,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 5,
         "delivery": (
             "✅ <b>Microsoft 365 Personal — Order Confirmed!</b>\n\n"
             "Your account credentials will be delivered by support shortly.\n"
@@ -193,7 +193,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 65,
         "delivery": (
             "✅ <b>Microsoft 365 Family — Order Confirmed!</b>\n\n"
             "Admin account credentials will be delivered by support shortly.\n"
@@ -217,7 +217,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 55,
         "delivery": (
             "✅ <b>Surfshark VPN — Order Confirmed!</b>\n\n"
             "Your account credentials will be delivered by support shortly.\n"
@@ -242,7 +242,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 13,
         "delivery": (
             "✅ <b>Windows 10 Pro Key — Order Confirmed!</b>\n\n"
             "Your activation key will be delivered by support shortly.\n"
@@ -266,7 +266,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 10,
         "delivery": (
             "✅ <b>Windows 11 Pro Key — Order Confirmed!</b>\n\n"
             "Your activation key will be delivered by support shortly.\n"
@@ -291,7 +291,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 74,
         "delivery": (
             "✅ <b>ChatGPT Plus (1 Month) — Order Confirmed!</b>\n\n"
             "Your account credentials will be delivered by support shortly.\n"
@@ -316,7 +316,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 76,
         "delivery": (
             "✅ <b>QuillBot Premium (1 Month) — Order Confirmed!</b>\n\n"
             "Your account credentials will be delivered by support shortly.\n"
@@ -340,7 +340,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 8,
         "delivery": (
             "✅ <b>Coursera Plus (12 Months) — Order Confirmed!</b>\n\n"
             "Your account credentials will be delivered by support shortly.\n"
@@ -362,7 +362,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 96,
         "delivery": (
             "✅ <b>Kiro Pro (1 Month) — Order Confirmed!</b>\n\n"
             "Your access credentials will be delivered by support shortly.\n"
@@ -383,7 +383,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 82,
         "delivery": (
             "✅ <b>Kiro Pro+ (1 Month) — Order Confirmed!</b>\n\n"
             "Your access credentials will be delivered by support shortly.\n"
@@ -404,7 +404,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 59,
         "delivery": (
             "✅ <b>Kiro Pro Max (1 Month) — Order Confirmed!</b>\n\n"
             "Your access credentials will be delivered by support shortly.\n"
@@ -425,7 +425,7 @@ PRODUCTS = [
             "🔄  Replacement —  <b>No</b>"
             "</blockquote>"
         ),
-        "stock": 100,
+        "stock": 87,
         "delivery": (
             "✅ <b>Kiro Power (1 Month) — Order Confirmed!</b>\n\n"
             "Your access credentials will be delivered by support shortly.\n"

@@ -4,6 +4,7 @@ Supports both PostgreSQL (via Neon / DATABASE_URL env var) and local SQLite (bot
 """
 
 import os
+import random
 import sqlite3
 import threading
 import time
@@ -535,25 +536,91 @@ def add_accounts_to_stock(product_id: str, accounts: list[str]) -> int:
 
 
 # --- Product catalog & stock --------------------------------------------------
+STOCK_CAP = 100  # a product may never be seeded with 100 or more
+
+
+def _clean_seed_stock(value, fallback: int = 1):
+    """Normalise the stock value used when a product is first inserted.
+
+    ``None`` stays ``None`` (= unlimited). Anything <= 0 or >= 100 is replaced by
+    a random value below 100 so the shop never shows a flat "100" or a 0 that was
+    not caused by real sales.
+    """
+    if value is None:
+        return None
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    if value <= 0 or value >= STOCK_CAP:
+        return random.randint(1, 99)
+    return value
+
+
 def seed_products(products: list) -> None:
+    """
+    UPSERT of the catalog — inserts new products and refreshes the editable
+    fields (name, price, description, delivery) of existing ones.
+
+    Stock is deliberately NOT overwritten for products that already exist, so
+    admin changes, real sales and the auto stock decay are never wiped by a bot
+    restart. Only brand-new rows get a stock value (always below 100).
+    """
     with _lock, _connect() as conn:
         for p in products:
-            cur = _exec(
-                conn,
-                "UPDATE products SET name = ?, price = ?, description = ?, delivery = ? WHERE id = ?",
-                (p["name"], float(p["price"]), p["description"], p.get("delivery", ""), p["id"]),
-            )
-            if cur.rowcount == 0:
+            pid = p["id"]
+            name = p["name"]
+            price = float(p["price"])
+            desc = p["description"]
+            stock = _clean_seed_stock(p.get("stock", 100))
+            delivery = p.get("delivery", "")
+
+            if IS_POSTGRES:
                 _exec(
                     conn,
-                    "INSERT INTO products (id, name, price, description, stock, delivery) VALUES (?, ?, ?, ?, ?, ?)",
-                    (p["id"], p["name"], float(p["price"]), p["description"], p.get("stock", 0), p.get("delivery", "")),
+                    """
+                    INSERT INTO products (id, name, price, description, stock, delivery)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET
+                        name        = EXCLUDED.name,
+                        price       = EXCLUDED.price,
+                        description = EXCLUDED.description,
+                        delivery    = EXCLUDED.delivery
+                    """,
+                    (pid, name, price, desc, stock, delivery),
                 )
-            _exec(
-                conn,
-                "INSERT INTO product_stock (product_id, stock) VALUES (?, ?) ON CONFLICT (product_id) DO NOTHING",
-                (p["id"], p.get("stock", 0)),
-            )
+                _exec(
+                    conn,
+                    """
+                    INSERT INTO product_stock (product_id, stock)
+                    VALUES (%s, %s)
+                    ON CONFLICT (product_id) DO NOTHING
+                    """,
+                    (pid, stock),
+                )
+            else:
+                _exec(
+                    conn,
+                    """
+                    INSERT INTO products (id, name, price, description, stock, delivery)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        name        = excluded.name,
+                        price       = excluded.price,
+                        description = excluded.description,
+                        delivery    = excluded.delivery
+                    """,
+                    (pid, name, price, desc, stock, delivery),
+                )
+                _exec(
+                    conn,
+                    """
+                    INSERT INTO product_stock (product_id, stock)
+                    VALUES (?, ?)
+                    ON CONFLICT(product_id) DO NOTHING
+                    """,
+                    (pid, stock),
+                )
 
 
 def get_all_products() -> list:

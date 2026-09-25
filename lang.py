@@ -162,7 +162,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Buy now",
         "btn_confirm": "✅ Confirm purchase",
-        "btn_orders": "📜 ✦ My Order History ✦",
+        "btn_orders": "📜 My Orders",
         "btn_back_shop": "⬅️ Back to shop",
         "btn_deposit_now": "💵 Deposit now",
         "shop_list": (
@@ -352,7 +352,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 अभी खरीदें",
         "btn_confirm": "✅ खरीद पक्की करें",
-        "btn_orders": "📜 ✦ मेरा ऑर्डर इतिहास ✦",
+        "btn_orders": "📜 मेरे ऑर्डर",
         "btn_back_shop": "⬅️ शॉप पर वापस",
         "btn_deposit_now": "💵 अभी डिपॉज़िट करें",
         "shop_list": (
@@ -537,7 +537,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Comprar ya",
         "btn_confirm": "✅ Confirmar compra",
-        "btn_orders": "📜 ✦ Historial de pedidos ✦",
+        "btn_orders": "📜 Mis pedidos",
         "btn_back_shop": "⬅️ Volver a la tienda",
         "btn_deposit_now": "💵 Depositar ahora",
         "shop_list": (
@@ -722,7 +722,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Купить",
         "btn_confirm": "✅ Подтвердить покупку",
-        "btn_orders": "📜 ✦ История заказов ✦",
+        "btn_orders": "📜 Мои заказы",
         "btn_back_shop": "⬅️ В магазин",
         "btn_deposit_now": "💵 Пополнить",
         "shop_list": (
@@ -904,7 +904,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 立即购买",
         "btn_confirm": "✅ 确认购买",
-        "btn_orders": "📜 ✦ 我的订单记录 ✦",
+        "btn_orders": "📜 我的订单",
         "btn_back_shop": "⬅️ 返回商店",
         "btn_deposit_now": "💵 立即充值",
         "shop_list": (
@@ -1086,7 +1086,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 اشترِ الآن",
         "btn_confirm": "✅ تأكيد الشراء",
-        "btn_orders": "📜 ✦ سجل طلباتي ✦",
+        "btn_orders": "📜 طلباتي",
         "btn_back_shop": "⬅️ العودة للمتجر",
         "btn_deposit_now": "💵 إيداع الآن",
         "shop_list": (
@@ -1269,7 +1269,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Acheter",
         "btn_confirm": "✅ Confirmer l'achat",
-        "btn_orders": "📜 ✦ Historique des commandes ✦",
+        "btn_orders": "📜 Mes commandes",
         "btn_back_shop": "⬅️ Retour à la boutique",
         "btn_deposit_now": "💵 Déposer",
         "shop_list": (
@@ -1453,7 +1453,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Comprar agora",
         "btn_confirm": "✅ Confirmar compra",
-        "btn_orders": "📜 ✦ Histórico de pedidos ✦",
+        "btn_orders": "📜 Meus pedidos",
         "btn_back_shop": "⬅️ Voltar à loja",
         "btn_deposit_now": "💵 Depositar agora",
         "shop_list": (
@@ -1637,7 +1637,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Jetzt kaufen",
         "btn_confirm": "✅ Kauf bestätigen",
-        "btn_orders": "📜 ✦ Meine Bestellhistorie ✦",
+        "btn_orders": "📜 Meine Bestellungen",
         "btn_back_shop": "⬅️ Zurück zum Shop",
         "btn_deposit_now": "💵 Jetzt einzahlen",
         "shop_list": (
@@ -1821,7 +1821,7 @@ TRANSLATIONS = {
         ),
         "btn_buy": "🛒 Beli sekarang",
         "btn_confirm": "✅ Konfirmasi pembelian",
-        "btn_orders": "📜 ✦ Riwayat Pesanan ✦",
+        "btn_orders": "📜 Pesanan Saya",
         "btn_back_shop": "⬅️ Kembali ke toko",
         "btn_deposit_now": "💵 Deposit sekarang",
         "shop_list": (
