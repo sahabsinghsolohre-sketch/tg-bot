@@ -770,20 +770,6 @@ def seed_products(products: list) -> None:
                     """,
                     (pid, stock),
                 )
-                        description = excluded.description,
-                        delivery    = excluded.delivery
-                    """,
-                    (pid, name, price, desc, stock, delivery),
-                )
-                _exec(
-                    conn,
-                    """
-                    INSERT INTO product_stock (product_id, stock)
-                    VALUES (?, ?)
-                    ON CONFLICT(product_id) DO NOTHING
-                    """,
-                    (pid, stock),
-                )
     clear_caches()  # catalog/stock snapshots are stale after a re-seed
 
 

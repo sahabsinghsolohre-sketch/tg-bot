@@ -349,55 +349,13 @@ PRODUCTS = [
     },
     # ------------------------------------------------------------------ Kiro
     {
-        "id": "kiro_pro_1m",
-        "name": "⚡ Kiro Pro — 1 Month",
-        "price": 6.00,
-        "description": (
-            "<b>AWS's AI-powered IDE — spec-driven development at its best.</b>\n\n"
-            "<blockquote>"
-            "💵  Price         —  <b>$6.00 / month</b>\n"
-            "📅  Duration     —  <b>1 Month</b>\n"
-            "🎟  Credits       —  <b>1,000 credits</b>\n"
-            "🤖  Models        —  <b>Claude Sonnet 4.5 + open-weight</b>\n"
-            "🔄  Replacement —  <b>No</b>"
-            "</blockquote>"
-        ),
-        "stock": 96,
-        "delivery": (
-            "✅ <b>Kiro Pro (1 Month) — Order Confirmed!</b>\n\n"
-            "Your access credentials will be delivered by support shortly.\n"
-            "📌 Keep your <b>Order ID</b> handy for reference."
-        ),
-    },
-    {
-        "id": "kiro_pro_plus_1m",
-        "name": "⚡ Kiro Pro+ — 1 Month",
-        "price": 12.00,
-        "description": (
-            "<b>Double the power for demanding development workflows.</b>\n\n"
-            "<blockquote>"
-            "💵  Price         —  <b>$12.00 / month</b>\n"
-            "📅  Duration     —  <b>1 Month</b>\n"
-            "🎟  Credits       —  <b>2,000 credits</b>\n"
-            "🤖  Models        —  <b>Claude Sonnet 5 + premium models</b>\n"
-            "🔄  Replacement —  <b>No</b>"
-            "</blockquote>"
-        ),
-        "stock": 82,
-        "delivery": (
-            "✅ <b>Kiro Pro+ (1 Month) — Order Confirmed!</b>\n\n"
-            "Your access credentials will be delivered by support shortly.\n"
-            "📌 Keep your <b>Order ID</b> handy for reference."
-        ),
-    },
-    {
         "id": "kiro_pro_max_1m",
         "name": "🚀 Kiro Pro Max — 1 Month",
-        "price": 31.00,
+        "price": 27.00,
         "description": (
             "<b>For power users and professional teams — Claude Opus 5.</b>\n\n"
             "<blockquote>"
-            "💵  Price         —  <b>$31.00 / month</b>\n"
+            "💵  Price         —  <b>$27.00 / month</b>\n"
             "📅  Duration     —  <b>1 Month</b>\n"
             "🎟  Credits       —  <b>5,000 credits</b>\n"
             "🤖  Models        —  <b>Claude Opus 5 + all premium</b>\n"
@@ -414,11 +372,11 @@ PRODUCTS = [
     {
         "id": "kiro_power_1m",
         "name": "👑 Kiro Power — 1 Month",
-        "price": 59.00,
+        "price": 35.00,
         "description": (
             "<b>The ultimate Kiro plan — maximum credits, all models unlocked.</b>\n\n"
             "<blockquote>"
-            "💵  Price         —  <b>$59.00 / month</b>\n"
+            "💵  Price         —  <b>$35.00 / month</b>\n"
             "📅  Duration     —  <b>1 Month</b>\n"
             "🎟  Credits       —  <b>10,000 credits</b>\n"
             "🤖  Models        —  <b>All models including Claude Opus 5</b>\n"
@@ -431,6 +389,369 @@ PRODUCTS = [
             "Your access credentials will be delivered by support shortly.\n"
             "📌 Keep your <b>Order ID</b> handy for reference."
         ),
+    },
+    # ================================================================== NEW PRODUCTS
+    # ------------------------------------------------------------------ Lenny's Bundle
+    {
+        "id": "lennys_bundle",
+        "name": "🎁 Lenny's Pass — Products Bundle",
+        "price": 45.00,
+        "description": (
+            "<b>The ultimate Lenny's Pass — a curated bundle of premium tools "
+            "and subscriptions in one massive package.</b>\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$45.00</b>\n"
+            "📦  Type          —  <b>Full products bundle</b>\n"
+            "🎯  Value          —  <b>Best value pack</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Lenny's Pass Bundle — Order Confirmed!</b>\n\nYour bundle access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ ChatGPT Plus 4M
+    {
+        "id": "chatgpt_plus_4m",
+        "name": "🤖 ChatGPT Plus — 4 Months (Scheduled FW)",
+        "price": 18.00,
+        "description": (
+            "<b>ChatGPT Plus for 4 months on a scheduled activation</b> — "
+            "GPT-4o, DALL·E 3, web browsing. Full warranty.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$18.00</b>\n"
+            "📅  Duration     —  <b>4 Months (scheduled)</b>\n"
+            "🧠  Models        —  <b>GPT-4o, DALL·E 3, Web browsing</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>ChatGPT Plus (4 Months) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Manus Pro
+    {
+        "id": "manus_pro_12m",
+        "name": "🧩 Manus Pro — 12 Months (Full Warranty)",
+        "price": 18.00,
+        "description": (
+            "<b>Manus Pro — the autonomous AI agent platform</b> for a full year "
+            "with complete warranty coverage.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$18.00</b>\n"
+            "📅  Duration     —  <b>12 Months</b>\n"
+            "🤖  Type          —  <b>Autonomous AI agent</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Manus Pro (12 Months) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Claude Pro 1M
+    {
+        "id": "claude_pro_1m",
+        "name": "🟠 Claude Pro — 1 Month (Full Warranty)",
+        "price": 10.00,
+        "description": (
+            "<b>Claude Pro by Anthropic — 1 month</b> with 5x more usage, "
+            "priority access and the latest Claude Opus &amp; Sonnet models.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$10.00</b>\n"
+            "📅  Duration     —  <b>1 Month</b>\n"
+            "🧠  Models        —  <b>Claude Opus &amp; Sonnet</b>\n"
+            "⚡  Usage         —  <b>5x more than free</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Claude Pro (1 Month) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Factory Pro
+    {
+        "id": "factory_pro_12m",
+        "name": "🏭 Factory Pro — 12 Months (Warranty)",
+        "price": 11.00,
+        "description": (
+            "<b>Factory Pro — AI-powered software development platform</b> "
+            "for a full year with warranty coverage.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$11.00</b>\n"
+            "📅  Duration     —  <b>12 Months</b>\n"
+            "⚙️  Type          —  <b>AI development automation</b>\n"
+            "🔄  Warranty     —  <b>Yes</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Factory Pro (12 Months) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ GitHub Student
+    {
+        "id": "github_student_2y",
+        "name": "🐙 GitHub Student Pack — 2 Years (FW)",
+        "price": 4.00,
+        "description": (
+            "<b>GitHub Student Developer Pack for 2 years</b> — free Copilot, "
+            "cloud credits and 100+ premium developer tools.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$4.00</b>\n"
+            "📅  Duration     —  <b>2 Years</b>\n"
+            "🎁  Includes     —  <b>Copilot + 100+ dev tools</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>GitHub Student Pack (2 Years) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ ChatGPT Business 48M
+    {
+        "id": "chatgpt_business_48m",
+        "name": "🤖 ChatGPT Business — 48 Months (1 Seat)",
+        "price": 12.00,
+        "description": (
+            "<b>ChatGPT Business seat for 48 months</b> — advanced data "
+            "privacy, admin controls and the full model lineup.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$12.00</b>\n"
+            "📅  Duration     —  <b>48 Months (1 free seat)</b>\n"
+            "🏢  Plan          —  <b>Business tier</b>\n"
+            "🔒  Privacy       —  <b>Data not used for training</b>\n"
+            "🔄  Warranty     —  <b>Yes</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>ChatGPT Business (48 Months) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Supabase
+    {
+        "id": "supabase_pro_12m",
+        "name": "⚡ Supabase Pro — 12 Months",
+        "price": 18.00,
+        "description": (
+            "<b>Supabase Pro — the open-source Firebase alternative</b> for "
+            "a full year with managed Postgres, Auth, Storage and Edge Functions.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$18.00</b>\n"
+            "📅  Duration     —  <b>12 Months</b>\n"
+            "🗄  Backend      —  <b>Postgres, Auth, Storage, Edge Fns</b>\n"
+            "🔄  Warranty     —  <b>Yes</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Supabase Pro (12 Months) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Cursor Pro 1M
+    {
+        "id": "cursor_pro_1m",
+        "name": "🖱 Cursor Pro — 1 Month (FW)",
+        "price": 11.00,
+        "description": (
+            "<b>Cursor Pro — the AI-first code editor</b> for 1 month with "
+            "unlimited completions and premium model access.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$11.00</b>\n"
+            "📅  Duration     —  <b>1 Month</b>\n"
+            "🤖  AI              —  <b>GPT-4 &amp; Claude powered</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Cursor Pro (1 Month) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Claude Pro 9M
+    {
+        "id": "claude_pro_9m",
+        "name": "🟠 Claude Pro — 9 Months Account (FW)",
+        "price": 60.00,
+        "description": (
+            "<b>Claude Pro account with 9 months of premium access</b> — "
+            "long-term subscription with full warranty.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$60.00</b>\n"
+            "📅  Duration     —  <b>9 Months</b>\n"
+            "🧠  Models        —  <b>Claude Opus &amp; Sonnet</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Claude Pro (9 Months) — Order Confirmed!</b>\n\nYour account will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Grok Super
+    {
+        "id": "grok_super_3m",
+        "name": "🛰 Grok Super — 3 Months Account (NW)",
+        "price": 12.00,
+        "description": (
+            "<b>Grok Super by xAI — 3 months</b> of the most capable Grok "
+            "models with real-time X (Twitter) integration.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$12.00</b>\n"
+            "📅  Duration     —  <b>3 Months</b>\n"
+            "🧠  Type          —  <b>Grok Super (xAI)</b>\n"
+            "🔄  Warranty     —  <b>No warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Grok Super (3 Months) — Order Confirmed!</b>\n\nYour account will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Claude Pro K12
+    {
+        "id": "claude_pro_12m_k12",
+        "name": "🟠 Claude Pro — 12M K12 Teachers (FW)",
+        "price": 32.00,
+        "description": (
+            "<b>Claude Pro for K-12 teachers — 12 months</b> of full "
+            "premium access under Anthropic's education programme.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$32.00</b>\n"
+            "📅  Duration     —  <b>12 Months</b>\n"
+            "🎓  Type          —  <b>K-12 Teachers programme</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Claude Pro (12M K12 Teachers) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Resend
+    {
+        "id": "resend_12m",
+        "name": "📧 Resend — 12 Months (Method)",
+        "price": 15.00,
+        "description": (
+            "<b>Resend — the developer email API</b> for a full year with "
+            "high deliverability and simple integration.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$15.00</b>\n"
+            "📅  Duration     —  <b>12 Months</b>\n"
+            "📨  Type          —  <b>Transactional email API</b>\n"
+            "🔄  Warranty     —  <b>Method based</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Resend (12 Months) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ LinkedIn Method
+    {
+        "id": "linkedin_method",
+        "name": "💼 LinkedIn Method — YT, NordVPN, Lovable",
+        "price": 28.00,
+        "description": (
+            "<b>LinkedIn method bundle</b> — unlocks YouTube Premium, "
+            "NordVPN and Lovable perks in one package.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$28.00</b>\n"
+            "🎁  Includes     —  <b>YouTube, NordVPN, Lovable</b>\n"
+            "📦  Type          —  <b>Method bundle</b>\n"
+            "🔄  Warranty     —  <b>Method based</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>LinkedIn Method Bundle — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ ChatGPT Business 1M
+    {
+        "id": "chatgpt_business_1m",
+        "name": "🤖 ChatGPT Business — 1 Month Seat (FW)",
+        "price": 9.00,
+        "description": (
+            "<b>ChatGPT Business standard seat for 1 month</b> — advanced "
+            "privacy, admin controls and full model access.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$9.00</b>\n"
+            "📅  Duration     —  <b>1 Month (1 seat)</b>\n"
+            "🏢  Plan          —  <b>Business standard</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>ChatGPT Business (1 Month) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ ChatGPT Plus 1M FW
+    {
+        "id": "chatgpt_plus_1m_fw",
+        "name": "🤖 ChatGPT Plus — 1 Month (Full Warranty)",
+        "price": 7.00,
+        "description": (
+            "<b>ChatGPT Plus for 1 month with full warranty</b> — "
+            "GPT-4o, DALL·E 3 and real-time web browsing.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$7.00</b>\n"
+            "📅  Duration     —  <b>1 Month</b>\n"
+            "🧠  Models        —  <b>GPT-4o, DALL·E 3, Web browsing</b>\n"
+            "🔄  Warranty     —  <b>Yes, full warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>ChatGPT Plus (1 Month FW) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Runway Pro
+    {
+        "id": "runway_pro_12m",
+        "name": "🎥 Runway Pro — 12 Months (Lenny's)",
+        "price": 11.00,
+        "description": (
+            "<b>Runway Pro — AI video generation</b> for a full year with "
+            "Gen-3 models, high-res exports and creative tools.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$11.00</b>\n"
+            "📅  Duration     —  <b>12 Months</b>\n"
+            "🎬  Type          —  <b>AI video generation (Gen-3)</b>\n"
+            "🔄  Warranty     —  <b>Yes</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Runway Pro (12 Months) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Higgsfield
+    {
+        "id": "higgsfield_12m",
+        "name": "🎞 Higgsfield — 12 Months (Lenny's)",
+        "price": 40.00,
+        "description": (
+            "<b>Higgsfield — advanced AI video &amp; motion tools</b> for a "
+            "full year of creative production.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$40.00</b>\n"
+            "📅  Duration     —  <b>12 Months</b>\n"
+            "🎬  Type          —  <b>AI video &amp; motion</b>\n"
+            "🔄  Warranty     —  <b>Yes</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Higgsfield (12 Months) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ ChatGPT MomoPay
+    {
+        "id": "chatgpt_plus_momopay",
+        "name": "🤖 ChatGPT Plus — MomoPay (NW)",
+        "price": 4.00,
+        "description": (
+            "<b>ChatGPT Plus via MomoPay method</b> — budget-friendly "
+            "access to GPT-4o and premium features.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$4.00</b>\n"
+            "🧠  Models        —  <b>GPT-4o, DALL·E 3</b>\n"
+            "💳  Method        —  <b>MomoPay</b>\n"
+            "🔄  Warranty     —  <b>No warranty</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>ChatGPT Plus (MomoPay) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
+    },
+    # ------------------------------------------------------------------ Cursor Pro 12M
+    {
+        "id": "cursor_pro_12m",
+        "name": "🖱 Cursor Pro — 12 Months (Lenny's)",
+        "price": 38.00,
+        "description": (
+            "<b>Cursor Pro — the AI-first code editor</b> for a full year with "
+            "unlimited completions and premium models.\n\n"
+            "<blockquote>"
+            "💵  Price         —  <b>$38.00</b>\n"
+            "📅  Duration     —  <b>12 Months</b>\n"
+            "🤖  AI              —  <b>GPT-4 &amp; Claude powered</b>\n"
+            "🔄  Warranty     —  <b>Yes</b>"
+            "</blockquote>"
+        ),
+        "stock": 100,
+        "delivery": "✅ <b>Cursor Pro (12 Months) — Order Confirmed!</b>\n\nYour access will be delivered by support shortly.\n📌 Keep your <b>Order ID</b> handy.",
     },
 ]
 
