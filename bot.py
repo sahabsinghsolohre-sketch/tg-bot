@@ -1143,6 +1143,10 @@ async def warm_caches(context: ContextTypes.DEFAULT_TYPE) -> None:
 # runs permanently dry. 99 is the highest value a customer can ever see.
 STOCK_MAX = 99
 STOCK_MIN = 12
+# Below STOCK_LOW the stock tends to restock (go up); above STOCK_HIGH it
+# tends to sell down. Between them it drifts randomly either way.
+STOCK_LOW = 25
+STOCK_HIGH = 80
 
 
 def random_stock() -> int:
@@ -1171,6 +1175,22 @@ def _refresh_stock_sync(mode: str) -> int:
                 updates[pid] = max(
                     STOCK_MIN, min(STOCK_MAX, stock - random.randint(1, 3))
                 )
+        elif mode == "fluctuate":
+            # Natural movement: stock drifts up or down by a small amount every
+            # cycle, like real sales + restocking. Low stock is more likely to
+            # go UP (restock), high stock more likely to go DOWN (sales).
+            if stock <= STOCK_LOW:
+                # Almost always restock a little (+1..+2), occasionally flat.
+                delta = random.choice([1, 1, 2, 2, 0])
+            elif stock >= STOCK_HIGH:
+                # Near the top: mostly sell down (-1..-2).
+                delta = random.choice([-1, -1, -2, 0])
+            else:
+                # Middle range: gentle random walk either way.
+                delta = random.choice([-2, -1, -1, 0, 1, 1, 2])
+            new_val = max(STOCK_MIN, min(STOCK_MAX, stock + delta))
+            if new_val != stock:
+                updates[pid] = new_val
         elif mode == "reset":
             updates[pid] = random_stock()
     if updates:
@@ -1195,9 +1215,12 @@ async def init_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
-async def decay_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Drop stock by 1-3 units every 5 minutes to create urgency (never below STOCK_MIN)."""
-    await _run_stock_job("decay")
+async def fluctuate_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Move stock up or down by 1-2 units every ~90 seconds so it looks alive:
+    low products restock upward, high products sell downward, mid drift randomly.
+    """
+    await _run_stock_job("fluctuate")
 
 
 async def reset_stock(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1282,9 +1305,10 @@ def main() -> None:
     application.job_queue.run_repeating(warm_caches, interval=CACHE_WARM_INTERVAL, first=3)
     # Give dry / 100-stock products a random value under 100 right after start-up.
     application.job_queue.run_once(init_stock, when=15)
-    # Fake stock decay: drop 1-3 units every 5 minutes (never below STOCK_MIN).
-    application.job_queue.run_repeating(decay_stock, interval=300, first=60)
-    # Refresh all fake stock with new random values (under 100) every 24 hours.
+    # Live stock movement: drift up/down by 1-2 every ~90s (restock when low,
+    # sell down when high) so the shop always looks active.
+    application.job_queue.run_repeating(fluctuate_stock, interval=90, first=60)
+    # Full random refresh (under 100) every 24 hours.
     application.job_queue.run_repeating(reset_stock, interval=86400, first=86400)
 
     logger.info("Bot is starting... Press Ctrl+C to stop.")
