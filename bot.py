@@ -169,20 +169,44 @@ def language_keyboard(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def shop_keyboard(lang: str) -> InlineKeyboardMarkup:
-    """List every product as a button, plus Refresh, My Orders and Back."""
+def shop_keyboard(lang: str, page: int = 0) -> InlineKeyboardMarkup:
+    """One page of products (10 per page) with pager, Refresh, Orders and Back."""
     rows = []
     prods = catalog.all_products()
-    stocks = db.get_stocks([p["id"] for p in prods])  # whole shop in 3 queries
-    for p in prods:
+    total = len(prods)
+    pages = max(1, (total + PRODUCTS_PER_PAGE - 1) // PRODUCTS_PER_PAGE)
+    page = max(0, min(page, pages - 1))  # clamp
+
+    start = page * PRODUCTS_PER_PAGE
+    page_items = prods[start:start + PRODUCTS_PER_PAGE]
+
+    stocks = db.get_stocks([p["id"] for p in page_items])
+    for p in page_items:
         stock = stocks.get(p["id"])
         sold_out = stock is not None and stock <= 0
         label = f"{p['name']} — ${p['price']:.2f}"
         if sold_out:
             label = f"❌ {label}"
         rows.append([InlineKeyboardButton(label, callback_data=f"prod_{p['id']}")])
+
+    # Pager row (only if more than one page)
+    if pages > 1:
+        pager = []
+        if page > 0:
+            pager.append(
+                InlineKeyboardButton("⬅️ Prev", callback_data=f"shop_p_{page - 1}")
+            )
+        pager.append(
+            InlineKeyboardButton(f"📄 {page + 1}/{pages}", callback_data="noop")
+        )
+        if page < pages - 1:
+            pager.append(
+                InlineKeyboardButton("Next ➡️", callback_data=f"shop_p_{page + 1}")
+            )
+        rows.append(pager)
+
     rows.append([
-        InlineKeyboardButton("🔄 Refresh", callback_data="products"),
+        InlineKeyboardButton("🔄 Refresh", callback_data=f"shop_p_{page}"),
         InlineKeyboardButton(t("btn_orders", lang), callback_data="orders"),
     ])
     rows.append([InlineKeyboardButton(t("btn_back", lang), callback_data="menu")])
@@ -817,7 +841,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
     elif data == "products":
-        await show_shop(query, lang)
+        await show_shop(query, lang, page=0)
+
+    elif data == "noop":
+        pass  # page indicator button — does nothing
+
+    elif data.startswith("shop_p_"):
+        try:
+            page = int(data[len("shop_p_"):])
+        except ValueError:
+            page = 0
+        await show_shop(query, lang, page=page)
 
     elif data == "orders":
         await show_orders(query, user_id, lang)
@@ -895,7 +929,7 @@ def _stock_label(product_id: str, lang: str, stock=_UNSET) -> str:
     return t("stock_unlimited", lang) if stock is None else str(stock)
 
 
-async def show_shop(query, lang: str) -> None:
+async def show_shop(query, lang: str, page: int = 0) -> None:
     prods = catalog.all_products()
     if not prods:
         await query.edit_message_text(
@@ -908,7 +942,7 @@ async def show_shop(query, lang: str) -> None:
     await query.edit_message_text(
         t("shop_list", lang, balance=balance),
         parse_mode="HTML",
-        reply_markup=shop_keyboard(lang),
+        reply_markup=shop_keyboard(lang, page),
     )
 
 
@@ -1143,6 +1177,8 @@ async def warm_caches(context: ContextTypes.DEFAULT_TYPE) -> None:
 # runs permanently dry. 99 is the highest value a customer can ever see.
 STOCK_MAX = 99
 STOCK_MIN = 12
+# Number of products shown per page in the shop.
+PRODUCTS_PER_PAGE = 10
 # Below STOCK_LOW the stock tends to restock (go up); above STOCK_HIGH it
 # tends to sell down. Between them it drifts randomly either way.
 STOCK_LOW = 25
